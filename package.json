@@ -1,0 +1,22 @@
+{
+  "name": "merge-matrix",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@types/node": "^26.3.0",
+    "three": "^0.183.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  },
+  "devDependencies": {
+    "@types/three": "^0.185.4"
+  }
+}

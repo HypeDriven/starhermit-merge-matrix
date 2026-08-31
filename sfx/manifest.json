@@ -1,0 +1,15 @@
+[
+  { "name": "ui-tap", "seconds": 1, "prompt": "Short soft plastic UI button tap, dry, gentle, high-pitched click", "event": "uiMove" },
+  { "name": "ui-back", "seconds": 1, "prompt": "Soft low UI back-navigation blip, short descending wooden tick", "event": "uiBack" },
+  { "name": "move-tick", "seconds": 1, "prompt": "Quiet mechanical tick of a board game counter advancing, single clean click", "event": "ack" },
+  { "name": "tile-slide", "seconds": 1, "prompt": "Smooth wooden tile sliding across a board surface, soft friction whoosh", "event": "slide" },
+  { "name": "merge-low", "seconds": 1, "prompt": "Two small wooden blocks knocking together into one, soft low thud with a light click", "event": "merge" },
+  { "name": "merge-mid", "seconds": 1, "prompt": "Medium ceramic tiles clacking and fusing together, warm rounded impact", "event": "merge" },
+  { "name": "merge-high", "seconds": 2, "prompt": "Large glass tiles merging with a bright resonant chime and solid impact", "event": "merge" },
+  { "name": "merge-max", "seconds": 2, "prompt": "Huge crystal tiles fusing with a deep boom and a shimmering sparkle tail", "event": "merge" },
+  { "name": "blocked-thud", "seconds": 1, "prompt": "Dull rejected thud of a tile bumping against a wall, muted rubber bump", "event": "invalid" },
+  { "name": "milestone-chime", "seconds": 3, "prompt": "Rising four-note celebratory chime arpeggio on bells, triumphant and bright", "event": "milestone" },
+  { "name": "game-over", "seconds": 3, "prompt": "Slow descending two-tone synth phrase fading out, melancholy end of a run", "event": "gameOver" },
+  { "name": "undo-whoosh", "seconds": 1, "prompt": "Quick reversed whoosh of time rewinding, airy backwards sweep", "event": "undo" },
+  { "name": "achievement-fanfare", "seconds": 2, "prompt": "Short achievement fanfare, bright bell ding followed by a sparkling glissando", "event": "achievement" }
+]

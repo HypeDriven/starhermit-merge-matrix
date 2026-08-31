@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Merge Matrix</title>
+<meta name="description" content="Merge Matrix — slide the grid, merge equal blocks, reach the milestone.">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%230a0e1a'/><rect x='2' y='2' width='5' height='5' rx='1' fill='%2341d9c0'/><rect x='9' y='2' width='5' height='5' rx='1' fill='%233f8cff'/><rect x='2' y='9' width='5' height='5' rx='1' fill='%233f8cff'/><rect x='9' y='9' width='5' height='5' rx='1' fill='%23ffe066'/></svg>">
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
+</head>
+<body>
+<div id="app">
+  <header id="topbar" role="banner">
+    <h1 id="brand">Merge Matrix</h1>
+    <div id="statusbar" role="status" aria-live="polite">
+      <span id="hud-score-label">Score</span> <strong id="hud-score">0</strong>
+      <span id="hud-best-label">Best</span> <strong id="hud-best">0</strong>
+      <span id="hud-moves-label">Moves</span> <strong id="hud-moves">0</strong>
+      <span id="hud-timer-wrap" hidden><span id="hud-timer-label">Time</span> <strong id="hud-timer">0:00</strong></span>
+    </div>
+    <div id="top-actions">
+      <button id="btn-pause" class="icon-btn" aria-label="Pause" hidden>⏸</button>
+      <button id="btn-settings-top" class="icon-btn" aria-label="Settings">⚙</button>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- ============ TITLE ============ -->
+    <section id="screen-title" class="screen" aria-labelledby="title-h">
+      <h2 id="title-h" class="visually-hidden">Main menu</h2>
+      <div class="title-hero" aria-hidden="true"><span class="t">2</span><span class="t">2</span><span class="t">4</span><span class="t">8</span></div>
+      <p id="resume-note" class="note" hidden>A run is in progress.</p>
+      <nav class="menu" aria-label="Main">
+        <button id="btn-resume" class="btn primary" hidden>Resume run</button>
+        <button id="btn-play" class="btn primary">Play</button>
+        <button id="btn-daily" class="btn">Daily challenge <span id="daily-date" class="note"></span></button>
+        <button id="btn-journey" class="btn">Journey <span id="journey-progress" class="note"></span></button>
+        <button id="btn-learn" class="btn">Learn</button>
+        <button id="btn-help" class="btn">How to play</button>
+      </nav>
+      <p id="profile-line" class="note">Guest profile · progress saves on this device</p>
+    </section>
+
+    <!-- ============ MODE SELECT ============ -->
+    <section id="screen-modes" class="screen" hidden aria-labelledby="modes-h">
+      <h2 id="modes-h">Choose a mode</h2>
+      <div class="card-grid" id="mode-cards">
+        <button class="card" data-mode="practice">
+          <strong>Practice</strong>
+          <span>Unranked. Pick a goal, undo allowed, restart freely.</span>
+        </button>
+        <button class="card" data-mode="challenge">
+          <strong>Challenge</strong>
+          <span>Move-limited runs. Beat the goal inside the budget.</span>
+        </button>
+        <button class="card" data-mode="score">
+          <strong>Score chase</strong>
+          <span>Seeded board, no undo. Compare on the leaderboard.</span>
+        </button>
+      </div>
+      <div id="mode-setup" class="panel" hidden>
+        <h3 id="mode-setup-h">Setup</h3>
+        <div id="mode-rules" class="note"></div>
+        <div id="practice-opts" hidden>
+          <label>Goal tile
+            <select id="practice-goal">
+              <option value="512">512 — quick</option>
+              <option value="1024">1024 — standard</option>
+              <option value="2048" selected>2048 — classic</option>
+              <option value="4096">4096 — deep</option>
+            </select>
+          </label>
+          <label>Board
+            <select id="practice-size">
+              <option value="4" selected>4 × 4</option>
+              <option value="3">3 × 3 — tight</option>
+              <option value="5">5 × 5 — wide</option>
+            </select>
+          </label>
+        </div>
+        <div id="challenge-opts" hidden>
+          <label>Challenge
+            <select id="challenge-kind">
+              <option value="moves">Move limit — reach 512 in 60 moves</option>
+              <option value="moves-hard">Move limit — reach 1024 in 100 moves</option>
+              <option value="speed">Speed — reach 256 within 2 minutes</option>
+              <option value="wide">Wide matrix — reach 2048 on 5 × 5</option>
+            </select>
+          </label>
+        </div>
+        <p id="ranked-note" class="note"></p>
+        <div class="row">
+          <button id="btn-mode-start" class="btn primary">Start</button>
+          <button id="btn-mode-back" class="btn">Back</button>
+        </div>
+      </div>
+      <div class="row"><button id="btn-modes-back" class="btn">Back</button></div>
+    </section>
+
+    <!-- ============ JOURNEY ============ -->
+    <section id="screen-journey" class="screen" hidden aria-labelledby="journey-h">
+      <h2 id="journey-h">Journey</h2>
+      <p class="note">Forty stages. Each band teaches one idea, combines it, then tests mastery every 8th stage.</p>
+      <div id="journey-grid" class="journey-grid" role="list"></div>
+      <div class="row"><button id="btn-journey-back" class="btn">Back</button></div>
+    </section>
+
+    <!-- ============ LEARN ============ -->
+    <section id="screen-learn" class="screen" hidden aria-labelledby="learn-h">
+      <h2 id="learn-h">Learn</h2>
+      <div id="lesson-list" class="card-grid"></div>
+      <div class="row"><button id="btn-learn-back" class="btn">Back</button></div>
+    </section>
+
+    <!-- ============ PLAY ============ -->
+    <section id="screen-play" class="screen play" hidden aria-labelledby="objective">
+      <div class="play-layout">
+        <aside class="rail rail-left">
+          <h2 id="objective">Objective</h2>
+          <p id="objective-text">Reach the goal tile.</p>
+          <div id="objective-progress" class="note"></div>
+          <div id="lesson-box" class="panel" hidden>
+            <h3 id="lesson-title"></h3>
+            <p id="lesson-text"></p>
+          </div>
+        </aside>
+        <div id="board-wrap">
+          <canvas id="gl" aria-hidden="true"></canvas>
+          <div id="dom-board" role="grid" aria-label="Merge Matrix board" tabindex="0"></div>
+          <div id="countdown" class="countdown" hidden aria-live="assertive"></div>
+        </div>
+        <aside class="rail rail-right">
+          <div class="row col">
+            <button id="btn-undo" class="btn small">Undo <span class="kbd">Z</span></button>
+            <button id="btn-hint" class="btn small">Hint <span class="kbd">H</span></button>
+            <button id="btn-restart" class="btn small">Restart</button>
+            <button id="btn-leave" class="btn small danger">Leave</button>
+          </div>
+          <div id="hint-box" class="panel" hidden aria-live="polite"></div>
+          <div id="invalid-box" class="panel warn" hidden role="alert"></div>
+          <div id="friends-panel" class="panel" hidden>
+            <h3>Leaderboard</h3>
+            <ol id="leaderboard-list"></ol>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ============ RESULTS ============ -->
+    <section id="screen-results" class="screen" hidden aria-labelledby="results-h">
+      <h2 id="results-h">Results</h2>
+      <p id="results-headline" class="headline"></p>
+      <table id="score-table" class="score-table">
+        <caption class="visually-hidden">Score breakdown</caption>
+        <tbody>
+          <tr><th scope="row">Merge points</th><td id="res-merge">0</td></tr>
+          <tr><th scope="row">Milestone bonus</th><td id="res-milestone">0</td></tr>
+          <tr><th scope="row">Efficiency bonus</th><td id="res-efficiency">0</td></tr>
+          <tr class="total"><th scope="row">Total</th><td id="res-total">0</td></tr>
+        </tbody>
+      </table>
+      <p id="res-detail" class="note"></p>
+      <p id="res-achievements" class="note good" hidden></p>
+      <p id="res-compare" class="note" hidden></p>
+      <div id="res-board-note" class="note" hidden></div>
+      <div class="row">
+        <button id="btn-retry" class="btn primary">Retry</button>
+        <button id="btn-next" class="btn" hidden>Next stage</button>
+        <button id="btn-results-menu" class="btn">Menu</button>
+      </div>
+    </section>
+
+    <!-- ============ HELP ============ -->
+    <section id="screen-help" class="screen" hidden aria-labelledby="help-h">
+      <h2 id="help-h">How to play</h2>
+      <div id="help-cards" class="card-grid"></div>
+      <div class="row"><button id="btn-help-back" class="btn">Back</button></div>
+    </section>
+
+    <!-- ============ PAUSE / SETTINGS ============ -->
+    <div id="overlay-pause" class="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="pause-h">
+      <div class="sheet">
+        <h2 id="pause-h">Paused</h2>
+        <button id="btn-resume-play" class="btn primary">Resume</button>
+        <details class="settings-block">
+          <summary>Audio</summary>
+          <label>Music <input type="range" id="set-music" min="0" max="100" value="50"></label>
+          <label>Effects <input type="range" id="set-fx" min="0" max="100" value="80"></label>
+          <label>Ambience <input type="range" id="set-ambience" min="0" max="100" value="40"></label>
+          <label class="check"><input type="checkbox" id="set-muted"> Mute all</label>
+          <label class="check"><input type="checkbox" id="set-captions"> Captions for sounds</label>
+        </details>
+        <details class="settings-block">
+          <summary>Graphics</summary>
+          <label>Quality
+            <select id="set-quality">
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high" selected>High</option>
+            </select>
+          </label>
+          <label>Theme <select id="set-theme"></select></label>
+          <label class="check"><input type="checkbox" id="set-render3d" checked> 3D board (WebGL)</label>
+        </details>
+        <details class="settings-block">
+          <summary>Accessibility &amp; controls</summary>
+          <label class="check"><input type="checkbox" id="set-reduced-motion"> Reduced motion</label>
+          <label class="check"><input type="checkbox" id="set-high-contrast"> High contrast</label>
+          <label class="check"><input type="checkbox" id="set-large-text"> Larger text</label>
+          <label class="check"><input type="checkbox" id="set-left-handed"> Left-handed action rail</label>
+          <label class="check"><input type="checkbox" id="set-haptics"> Haptics on touch</label>
+          <button id="btn-replay-tutorial" class="btn small">Replay tutorial</button>
+        </details>
+        <div class="row">
+          <button id="btn-pause-restart" class="btn">Restart run</button>
+          <button id="btn-pause-leave" class="btn danger">Leave run</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- settings shortcut reuses the pause sheet -->
+    <div id="caption-live" class="caption-live" aria-live="polite"></div>
+    <div id="a11y-live" class="visually-hidden" aria-live="polite"></div>
+    <div id="offline-note" class="note" hidden>Offline — hosted features unavailable, local play continues.</div>
+  </main>
+</div>
+<script type="module" src="dist/main.js"></script>
+</body>
+</html>
