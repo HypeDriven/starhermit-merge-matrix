@@ -21,6 +21,8 @@ let lastFocused: Element | null = null;
 let serverOffsetMs = 0; // serverTime - clientTime
 let online = true;
 let currentScreen = 'title';
+let runFinished = false;    // guards finishRun against the rAF loop / setTimeout race
+let finishScheduled = false; // a delayed reveal is pending; the loop must not pre-empt it
 
 /* ---------------- platform (/api) ---------------- */
 
@@ -133,8 +135,11 @@ function themeNow(): content.ThemeDef {
 function startRun(mode: ActiveSession['mode'], contentId: string, opts: RulesOptions, ranked: boolean): void {
   const sess = session.startSession(mode, contentId, opts, ranked);
   paused = false;
+  runFinished = false;
+  finishScheduled = false;
   setupBoard(sess.state);
   show('play');
+  fitCanvas();
   runCountdown(() => announce('Go'));
   updateAll();
   audio.ensureAudio();
@@ -188,11 +193,16 @@ function updateAll(): void {
 
 function finishRun(): void {
   const sess = session.getActive();
-  if (!sess) return;
+  // a run resolves exactly once, and only when it is actually over: the rAF loop
+  // and doMove's delayed call both land here, and a stale delayed call must never
+  // resolve whatever run the player started in the meantime
+  if (!sess || runFinished || !sess.state.over) return;
+  runFinished = true;
   const st = sess.state;
   const total = rules.scoreTotal(st);
-  // records
-  if ((progress.bestScores[sess.contentId] ?? 0) < total) progress.bestScores[sess.contentId] = total;
+  // records — capture the previous best before it is overwritten below
+  const prevBest = progress.bestScores[sess.contentId] ?? 0;
+  if (prevBest < total) progress.bestScores[sess.contentId] = total;
   progress.gamesPlayed++;
   if (sess.mode === 'daily') {
     const day = session.utcToday();
@@ -203,6 +213,7 @@ function finishRun(): void {
     if (stage && !progress.journeyCompleted.includes(stage.index)) progress.journeyCompleted.push(stage.index);
   }
   if (sess.mode === 'learn' && st.won) progress.tutorialDone = true;
+  stopCountdown();
   const newAch = session.evaluateAchievements(progress, sess);
   session.saveProgress(progress);
   session.clearSnapshot();
@@ -225,9 +236,8 @@ function finishRun(): void {
     audio.sfx.achievement();
   } else achEl.hidden = true;
   const cmp = $('res-compare');
-  const prevBest = progress.bestScores[sess.contentId] ?? 0;
   cmp.hidden = false;
-  cmp.textContent = total >= prevBest ? 'New personal best for this board.' : `Personal best here: ${prevBest}.`;
+  cmp.textContent = total > prevBest ? 'New personal best for this board.' : `Personal best here: ${prevBest}.`;
   $('res-board-note').hidden = true;
 
   const nextBtn = $('btn-next');
@@ -295,7 +305,17 @@ function doMove(dir: Dir): void {
   announce(`Moved ${dir}. Score ${rules.scoreTotal(sess.state)}. ${ui.boardSummary(sess.state)}`);
   hideInvalid();
   checkLessonProgress();
-  if (r.gameOver) setTimeout(() => finishRun(), 450);
+  if (r.gameOver) scheduleFinish(sess, 450);
+}
+
+/** Let the final move land on screen before the results take over. */
+function scheduleFinish(sess: ActiveSession, delayMs: number): void {
+  finishScheduled = true;
+  setTimeout(() => {
+    if (session.getActive() !== sess) return;
+    finishScheduled = false;
+    if (currentScreen === 'play') finishRun();
+  }, delayMs);
 }
 
 function doUndo(): void {
@@ -330,15 +350,23 @@ function showInvalid(msg: string): void {
 }
 function hideInvalid(): void { $('invalid-box').hidden = true; }
 
+let countdownIv: ReturnType<typeof setInterval> | null = null;
+
+function stopCountdown(): void {
+  if (countdownIv !== null) { clearInterval(countdownIv); countdownIv = null; }
+  $('countdown').hidden = true;
+}
+
 function runCountdown(done: () => void): void {
+  stopCountdown(); // a restart mid-countdown must not leave a stale interval running
   const el = $('countdown');
   if (settings.reducedMotion) { done(); return; }
   let n = 3;
   el.hidden = false;
   el.textContent = String(n);
-  const iv = setInterval(() => {
+  countdownIv = setInterval(() => {
     n--;
-    if (n <= 0) { clearInterval(iv); el.hidden = true; done(); return; }
+    if (n <= 0) { stopCountdown(); done(); return; }
     el.textContent = String(n);
   }, 450);
 }
@@ -361,6 +389,7 @@ function onKey(e: KeyboardEvent): void {
   }
   if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') {
     if (currentScreen === 'play') { e.preventDefault(); togglePause(); }
+    else if (!$('overlay-pause').hidden) { e.preventDefault(); togglePause(false); }
   }
 }
 
@@ -419,6 +448,11 @@ function togglePause(force?: boolean): void {
   const ov = $('overlay-pause');
   if (paused) {
     lastFocused = document.activeElement;
+    // outside a run the same sheet is the settings dialog: run actions do not apply
+    const inRun = currentScreen === 'play' && !!session.getActive();
+    $('pause-h').textContent = inRun ? 'Paused' : 'Settings';
+    $('btn-resume-play').textContent = inRun ? 'Resume' : 'Close';
+    $('pause-run-actions').hidden = !inRun;
     ov.hidden = false;
     session.persistSnapshot();
     audio.suspendAudio();
@@ -556,7 +590,7 @@ function checkLessonProgress(): void {
     st.over = true;
     st.terminalReason = 'goal-reached';
     st.score.milestoneBonus += 100;
-    setTimeout(() => finishRun(), 300);
+    scheduleFinish(sess, 300);
     activeLesson = null;
     $('lesson-box').hidden = true;
   }
@@ -572,8 +606,8 @@ function loop(time: number): void {
   if (currentScreen === 'play' && sess && !paused) {
     session.advanceClock();
     if (sess.state.timeLimitMs > 0) updateAll();
-    if (sess.state.over && currentScreen === 'play') {
-      // timer-driven termination
+    if (sess.state.over && currentScreen === 'play' && !finishScheduled) {
+      // timer-driven termination (move-driven endings reveal on their own delay)
       finishRun();
     }
   }
@@ -598,7 +632,7 @@ function bindButtons(): void {
   $('btn-learn-back').addEventListener('click', () => { show('title'); refreshTitle(); });
   $('btn-resume').addEventListener('click', () => {
     const sess = session.resumeSnapshot();
-    if (sess) { setupBoard(sess.state); show('play'); updateAll(); }
+    if (sess) { runFinished = false; finishScheduled = false; paused = false; setupBoard(sess.state); show('play'); fitCanvas(); updateAll(); }
   });
   for (const card of document.querySelectorAll<HTMLElement>('#mode-cards .card')) {
     card.addEventListener('click', () => openModeSetup(card.dataset.mode ?? 'practice'));
@@ -640,8 +674,24 @@ function restartRun(): void {
 
 function leaveRun(): void {
   session.persistSnapshot();
+  stopCountdown();
   show('title');
   refreshTitle();
+}
+
+function applyRenderMode(): void {
+  const canvas = $('gl') as unknown as HTMLCanvasElement;
+  const board = $('dom-board');
+  if (settings.render3d && !glActive) {
+    // reuse an existing context when possible: a disposed canvas cannot be re-acquired
+    glActive = render.isReady() || render.initRender(canvas, { quality: settings.quality, reducedMotion: settings.reducedMotion });
+    if (!glActive) announce('3D unavailable — using the accessible board view.');
+  } else if (!settings.render3d && glActive) {
+    glActive = false;
+  }
+  canvas.hidden = !glActive;
+  board.classList.toggle('dom-primary', !glActive);
+  board.classList.toggle('dom-mirror', glActive);
 }
 
 function onSettingsChanged(s: Settings): void {
@@ -649,9 +699,10 @@ function onSettingsChanged(s: Settings): void {
   session.saveSettings(s);
   ui.applySettingsToDom(s);
   audio.configureAudio(s);
+  applyRenderMode();
   render.updateQuality({ quality: s.quality, reducedMotion: s.reducedMotion });
   const sess = session.getActive();
-  if (sess) setupBoard(sess.state);
+  if (sess) { setupBoard(sess.state); fitCanvas(); }
   updateAll();
 }
 
@@ -667,15 +718,8 @@ async function boot(): Promise<void> {
   document.addEventListener('pointerdown', () => audio.ensureAudio(), { once: true });
 
   // 3D init with graceful fallback
-  const canvas = $('gl') as unknown as HTMLCanvasElement;
-  glActive = settings.render3d && render.initRender(canvas, { quality: settings.quality, reducedMotion: settings.reducedMotion });
-  if (!glActive) {
-    $('dom-board').classList.add('dom-primary');
-    canvas.hidden = true;
-    if (settings.render3d) announce('3D unavailable — using the accessible board view.');
-  } else {
-    $('dom-board').classList.add('dom-mirror');
-  }
+  applyRenderMode();
+  fitCanvas();
 
   await syncServerTime();
   show('title');

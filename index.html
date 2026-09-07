@@ -7,7 +7,6 @@
 <title>Merge Matrix</title>
 <meta name="description" content="Merge Matrix — slide the grid, merge equal blocks, reach the milestone.">
 <link rel="stylesheet" href="style.css">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%230a0e1a'/><rect x='2' y='2' width='5' height='5' rx='1' fill='%2341d9c0'/><rect x='9' y='2' width='5' height='5' rx='1' fill='%233f8cff'/><rect x='2' y='9' width='5' height='5' rx='1' fill='%233f8cff'/><rect x='9' y='9' width='5' height='5' rx='1' fill='%23ffe066'/></svg>">
 <script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
 </head>
 <body>
@@ -213,7 +212,7 @@
           <label class="check"><input type="checkbox" id="set-haptics"> Haptics on touch</label>
           <button id="btn-replay-tutorial" class="btn small">Replay tutorial</button>
         </details>
-        <div class="row">
+        <div class="row" id="pause-run-actions">
           <button id="btn-pause-restart" class="btn">Restart run</button>
           <button id="btn-pause-leave" class="btn danger">Leave run</button>
         </div>

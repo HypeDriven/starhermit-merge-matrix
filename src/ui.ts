@@ -114,6 +114,7 @@ export function bindSettingsForm(s: Settings, onChange: (s: Settings) => void): 
   get<HTMLInputElement>('set-render3d').addEventListener('change', (e) => { s.render3d = (e.target as HTMLInputElement).checked; emit(); });
   get<HTMLInputElement>('set-reduced-motion').addEventListener('change', (e) => { s.reducedMotion = (e.target as HTMLInputElement).checked; emit(); });
   get<HTMLInputElement>('set-high-contrast').addEventListener('change', (e) => { s.highContrast = (e.target as HTMLInputElement).checked; emit(); });
+  get<HTMLInputElement>('set-large-text').addEventListener('change', (e) => { s.largeText = (e.target as HTMLInputElement).checked; emit(); });
   get<HTMLInputElement>('set-left-handed').addEventListener('change', (e) => { s.leftHanded = (e.target as HTMLInputElement).checked; emit(); });
   get<HTMLInputElement>('set-haptics').addEventListener('change', (e) => { s.haptics = (e.target as HTMLInputElement).checked; emit(); });
 }
@@ -127,7 +128,7 @@ export function buildHelpCards(el: HTMLElement): void {
     ['New blocks', 'After every valid move, a new 2 (90%) or 4 (10%) appears in a random empty cell, chosen by the run\'s seed.'],
     ['Scoring', 'You score the value of every merge. Reaching the goal tile adds a milestone bonus; constrained modes add an efficiency bonus.'],
     ['Losing', 'The run ends when no move changes the board — a full grid with no adjacent equals.'],
-    ['Controls', 'Arrows/WASD: slide · Z: undo (where allowed) · H: hint · P/Esc: pause · R: restart · buttons work by touch and mouse.'],
+    ['Controls', 'Arrows/WASD: slide · Z: undo (where allowed) · H: hint · P/Esc: pause · swipe or drag on the board · every action also has a button.'],
     ['Seeds & fairness', 'Practice and Journey seeds are fixed. The daily seed is shared per UTC day, so everyone plays the same board.'],
   ];
   for (const [h, body] of cards) {

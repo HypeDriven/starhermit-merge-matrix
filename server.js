@@ -143,6 +143,10 @@ function applyMove(st, dir) {
 
 function verifyReplay(env) {
   if (!env || env.schema !== 1 || env.rulesVersion !== RULES_VERSION) return null;
+  if (!Number.isFinite(env.seed) || !env.terminal) return null;
+  if (!Array.isArray(env.commands) || !Array.isArray(env.hashes)) return null;
+  if (env.commands.length !== env.hashes.length || env.commands.length > 100000) return null;
+  if (env.options != null && typeof env.options !== 'object') return null;
   const st = createGame({ ...env.options, seed: env.seed });
   if (stateHash(st) !== env.initialHash) return null;
   for (let i = 0; i < env.commands.length; i++) {
@@ -214,8 +218,18 @@ function readBody(req, limit = 256 * 1024) {
 
 function validDay(day) { return /^\d{4}-\d{2}-\d{2}$/.test(day); }
 
-const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, 'http://x');
+const server = http.createServer((req, res) => {
+  // a rejected handler would otherwise leave the request hanging with no response
+  handle(req, res).catch((err) => {
+    console.error('request failed:', err && err.message);
+    if (!res.headersSent) sendJson(res, 500, { error: 'server-error' });
+    else res.end();
+  });
+});
+
+async function handle(req, res) {
+  let url;
+  try { url = new URL(req.url, 'http://x'); } catch { return sendJson(res, 400, { error: 'bad-request' }); }
   const ip = req.socket.remoteAddress ?? 'local';
 
   if (url.pathname.startsWith('/api/')) {
@@ -248,6 +262,13 @@ const server = http.createServer(async (req, res) => {
       }
       const expectedSeed = dailySeed(day);
       if (replay.seed !== expectedSeed) return sendJson(res, 422, { error: 'seed-mismatch' });
+      // the daily board is fixed: reject replays that redefine the rules (e.g. an
+      // inflated goalTile would mint an arbitrarily large milestone bonus)
+      const o = replay.options ?? {};
+      if ((o.size ?? 4) !== 4 || (o.goalTile ?? 2048) !== 2048 ||
+          (o.moveLimit ?? 0) !== 0 || (o.timeLimitMs ?? 0) !== 0) {
+        return sendJson(res, 422, { error: 'options-mismatch' });
+      }
       const finalState = verifyReplay(replay);
       if (!finalState) return sendJson(res, 422, { error: 'replay-invalid' });
       const total = finalState.score.mergePoints + finalState.score.milestoneBonus + finalState.score.efficiencyBonus;
@@ -293,10 +314,17 @@ const server = http.createServer(async (req, res) => {
   }
 
   /* static files */
-  let p = decodeURIComponent(url.pathname);
+  let p;
+  try { p = decodeURIComponent(url.pathname); } catch { return sendJson(res, 400, { error: 'bad-path' }); }
   if (p === '/') p = '/index.html';
   const file = path.normalize(path.join(ROOT, p));
-  if (!file.startsWith(ROOT) || file.includes(`${path.sep}.data`)) return sendJson(res, 403, { error: 'forbidden' });
+  // stay inside ROOT, and never expose dot-directories (.git, .data) or node_modules
+  const rel = path.relative(ROOT, file);
+  const segments = rel.split(path.sep);
+  if (rel === '' || rel.startsWith('..') || path.isAbsolute(rel) ||
+      segments.some((s) => s.startsWith('.') || s === 'node_modules')) {
+    return sendJson(res, 403, { error: 'forbidden' });
+  }
   fs.readFile(file, (err, data) => {
     if (err) return sendJson(res, 404, { error: 'not-found' });
     const ext = path.extname(file);
@@ -307,7 +335,7 @@ const server = http.createServer(async (req, res) => {
     });
     res.end(data);
   });
-});
+}
 
 ensureData();
 server.listen(PORT, () => {

@@ -33,6 +33,22 @@ let shake = 0;
 let glow: THREE.PointLight | null = null;
 const texCache = new Map<string, THREE.CanvasTexture>();
 
+function disposeMesh(group: THREE.Group, mesh: THREE.Mesh): void {
+  group.remove(mesh);
+  mesh.geometry.dispose();
+  const mat = mesh.material as THREE.Material | THREE.Material[];
+  if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
+  else mat.dispose();
+}
+
+/** Box faces in geometry order: only the top face carries the number. */
+function tileMaterials(v: number): THREE.Material[] {
+  const col = new THREE.Color(tileColor(v));
+  const side = new THREE.MeshStandardMaterial({ color: col, roughness: 0.35, metalness: 0.25, emissive: col, emissiveIntensity: 0.25 });
+  const top = new THREE.MeshStandardMaterial({ map: labelTexture(v), roughness: 0.35, metalness: 0.25, emissive: col, emissiveIntensity: 0.25 });
+  return [side, side.clone(), top, side.clone(), side.clone(), side.clone()];
+}
+
 export function initRender(canvas: HTMLCanvasElement, settings: RenderSettings): boolean {
   cfg = settings;
   canvasEl = canvas;
@@ -48,8 +64,7 @@ export function initRender(canvas: HTMLCanvasElement, settings: RenderSettings):
 
   // authored framing: low-distortion perspective, near-tabletop angle
   camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
-  camera.position.set(0, 4.2, 6.2);
-  camera.lookAt(0, 0, 0.2);
+  frameCamera();
 
   const key = new THREE.DirectionalLight(0xffffff, 2.2);
   key.position.set(3, 6, 4);
@@ -72,6 +87,11 @@ export function initRender(canvas: HTMLCanvasElement, settings: RenderSettings):
   scene.add(boardGroup);
   disposed = false;
   return true;
+}
+
+/** True once a WebGL context exists and has not been disposed. */
+export function isReady(): boolean {
+  return renderer !== null && !disposed;
 }
 
 export function setTheme(t: ThemeDef): void {
@@ -127,7 +147,7 @@ export function buildBoard(newSize: number): void {
   if (!boardGroup || !theme) return;
   size = newSize;
   // dispose old
-  for (const row of tiles) for (const t of row) if (t) { boardGroup.remove(t.mesh); t.mesh.geometry.dispose(); (t.mesh.material as THREE.Material).dispose(); }
+  for (const row of tiles) for (const t of row) if (t) disposeMesh(boardGroup, t.mesh);
   for (const m of cellMeshes) { boardGroup.remove(m); m.geometry.dispose(); (m.material as THREE.Material).dispose(); }
   tiles = Array.from({ length: size }, () => new Array<TileView | null>(size).fill(null));
   cellMeshes = [];
@@ -151,6 +171,31 @@ export function buildBoard(newSize: number): void {
   slab.position.y = -0.2;
   boardGroup.add(slab);
   cellMeshes.push(slab);
+  frameCamera(); // a 5×5 board needs more room than a 4×4 one
+}
+
+const CAM_TARGET = new THREE.Vector3(0, 0, 0.2);
+const CAM_BASE_DIST = 7.32; // authored tabletop distance for a wide viewport
+const camPos = new THREE.Vector3(0, 4.2, 6.2);
+const camDir = new THREE.Vector3();
+
+/**
+ * Keep the whole board inside the frame. The authored tabletop angle assumes a
+ * wide viewport; on a portrait one (phone) it would crop the outer columns, so
+ * the camera both retreats until the full width fits and tilts toward overhead,
+ * which trades depth foreshortening for the vertical room a phone actually has.
+ */
+function frameCamera(): void {
+  if (!camera) return;
+  const wide = Math.max(0, Math.min(1, (camera.aspect - 0.7) / 0.4)); // 0 portrait → 1 wide
+  camDir.set(0, 7.0 + (4.2 - 7.0) * wide, 2.6 + (6.0 - 2.6) * wide).normalize();
+  const halfWidth = (size + 0.6) / 2;
+  const tanHalfV = Math.tan((camera.fov * Math.PI) / 360);
+  const fitWidth = halfWidth / (tanHalfV * Math.max(0.2, camera.aspect));
+  const dist = Math.max(CAM_BASE_DIST, fitWidth);
+  camPos.copy(camDir).multiplyScalar(dist).add(CAM_TARGET);
+  camera.position.copy(camPos);
+  camera.lookAt(CAM_TARGET);
 }
 
 function cellPos(r: number, c: number): THREE.Vector3 {
@@ -169,25 +214,15 @@ export function setBoard(board: number[][], changed?: Set<string>, merged?: Set<
       let t = tiles[r][c];
       if (v === 0) {
         if (t) {
-          boardGroup.remove(t.mesh);
-          t.mesh.geometry.dispose();
-          (t.mesh.material as THREE.Material).dispose();
+          disposeMesh(boardGroup, t.mesh);
           tiles[r][c] = null;
         }
         continue;
       }
       if (!t || t.value !== v) {
-        if (t) {
-          boardGroup.remove(t.mesh);
-          t.mesh.geometry.dispose();
-          (t.mesh.material as THREE.Material).dispose();
-        }
+        if (t) disposeMesh(boardGroup, t.mesh);
         const geo = new THREE.BoxGeometry(0.86, 0.3, 0.86);
-        const mat = new THREE.MeshStandardMaterial({
-          map: labelTexture(v), roughness: 0.35, metalness: 0.25,
-          emissive: new THREE.Color(tileColor(v)), emissiveIntensity: 0.25,
-        });
-        const mesh = new THREE.Mesh(geo, mat);
+        const mesh = new THREE.Mesh(geo, tileMaterials(v));
         mesh.position.copy(cellPos(r, c));
         boardGroup.add(mesh);
         t = { mesh, value: v, targetScale: 1, pulse: 0 };
@@ -225,13 +260,13 @@ export function frame(time: number): void {
   }
   if (shake > 0.001 && camera) {
     shake *= Math.pow(0.001, dt); // critically damped decay
-    camera.position.x = Math.sin(time * 0.09) * shake * 0.06;
-    camera.position.y = 4.2 + Math.cos(time * 0.11) * shake * 0.04;
-    camera.lookAt(0, 0, 0.2);
+    camera.position.x = camPos.x + Math.sin(time * 0.09) * shake * 0.06;
+    camera.position.y = camPos.y + Math.cos(time * 0.11) * shake * 0.04;
+    camera.lookAt(CAM_TARGET);
   } else if (camera && shake !== 0) {
     shake = 0;
-    camera.position.set(0, 4.2, 6.2);
-    camera.lookAt(0, 0, 0.2);
+    camera.position.copy(camPos);
+    camera.lookAt(CAM_TARGET);
   }
   if (glow) glow.intensity += (8 - glow.intensity) * Math.min(1, dt * 3);
   renderer.render(scene, camera);
@@ -244,6 +279,7 @@ export function resize(w: number, h: number, dpr: number): void {
   renderer.setSize(w, h, false);
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
+  frameCamera();
 }
 
 export function updateQuality(q: RenderSettings): void {

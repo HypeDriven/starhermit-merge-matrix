@@ -146,8 +146,6 @@ function checkTerminal(st) {
     if (st.moveLimit > 0 && st.moves >= st.moveLimit) {
         st.over = true;
         st.terminalReason = st.won ? 'goal-reached' : 'move-limit-exhausted';
-        if (st.won)
-            st.score.efficiencyBonus += Math.max(0, (st.moveLimit - st.moves)) * 0; // moves used exactly
         return;
     }
     if (legalMoves({ ...st, over: false }).length === 0) {

@@ -17,6 +17,8 @@ let lastFocused = null;
 let serverOffsetMs = 0; // serverTime - clientTime
 let online = true;
 let currentScreen = 'title';
+let runFinished = false; // guards finishRun against the rAF loop / setTimeout race
+let finishScheduled = false; // a delayed reveal is pending; the loop must not pre-empt it
 /* ---------------- platform (/api) ---------------- */
 async function api(path, init) {
     try {
@@ -127,8 +129,11 @@ function themeNow() {
 function startRun(mode, contentId, opts, ranked) {
     const sess = session.startSession(mode, contentId, opts, ranked);
     paused = false;
+    runFinished = false;
+    finishScheduled = false;
     setupBoard(sess.state);
     show('play');
+    fitCanvas();
     runCountdown(() => announce('Go'));
     updateAll();
     audio.ensureAudio();
@@ -184,12 +189,17 @@ function updateAll() {
 }
 function finishRun() {
     const sess = session.getActive();
-    if (!sess)
+    // a run resolves exactly once, and only when it is actually over: the rAF loop
+    // and doMove's delayed call both land here, and a stale delayed call must never
+    // resolve whatever run the player started in the meantime
+    if (!sess || runFinished || !sess.state.over)
         return;
+    runFinished = true;
     const st = sess.state;
     const total = rules.scoreTotal(st);
-    // records
-    if ((progress.bestScores[sess.contentId] ?? 0) < total)
+    // records — capture the previous best before it is overwritten below
+    const prevBest = progress.bestScores[sess.contentId] ?? 0;
+    if (prevBest < total)
         progress.bestScores[sess.contentId] = total;
     progress.gamesPlayed++;
     if (sess.mode === 'daily') {
@@ -204,6 +214,7 @@ function finishRun() {
     }
     if (sess.mode === 'learn' && st.won)
         progress.tutorialDone = true;
+    stopCountdown();
     const newAch = session.evaluateAchievements(progress, sess);
     session.saveProgress(progress);
     session.clearSnapshot();
@@ -227,9 +238,8 @@ function finishRun() {
     else
         achEl.hidden = true;
     const cmp = $('res-compare');
-    const prevBest = progress.bestScores[sess.contentId] ?? 0;
     cmp.hidden = false;
-    cmp.textContent = total >= prevBest ? 'New personal best for this board.' : `Personal best here: ${prevBest}.`;
+    cmp.textContent = total > prevBest ? 'New personal best for this board.' : `Personal best here: ${prevBest}.`;
     $('res-board-note').hidden = true;
     const nextBtn = $('btn-next');
     if (sess.mode === 'journey' && st.won) {
@@ -303,7 +313,18 @@ function doMove(dir) {
     hideInvalid();
     checkLessonProgress();
     if (r.gameOver)
-        setTimeout(() => finishRun(), 450);
+        scheduleFinish(sess, 450);
+}
+/** Let the final move land on screen before the results take over. */
+function scheduleFinish(sess, delayMs) {
+    finishScheduled = true;
+    setTimeout(() => {
+        if (session.getActive() !== sess)
+            return;
+        finishScheduled = false;
+        if (currentScreen === 'play')
+            finishRun();
+    }, delayMs);
 }
 function doUndo() {
     const sess = session.getActive();
@@ -337,7 +358,16 @@ function showInvalid(msg) {
     announce(msg);
 }
 function hideInvalid() { $('invalid-box').hidden = true; }
+let countdownIv = null;
+function stopCountdown() {
+    if (countdownIv !== null) {
+        clearInterval(countdownIv);
+        countdownIv = null;
+    }
+    $('countdown').hidden = true;
+}
 function runCountdown(done) {
+    stopCountdown(); // a restart mid-countdown must not leave a stale interval running
     const el = $('countdown');
     if (settings.reducedMotion) {
         done();
@@ -346,11 +376,10 @@ function runCountdown(done) {
     let n = 3;
     el.hidden = false;
     el.textContent = String(n);
-    const iv = setInterval(() => {
+    countdownIv = setInterval(() => {
         n--;
         if (n <= 0) {
-            clearInterval(iv);
-            el.hidden = true;
+            stopCountdown();
             done();
             return;
         }
@@ -389,6 +418,10 @@ function onKey(e) {
         if (currentScreen === 'play') {
             e.preventDefault();
             togglePause();
+        }
+        else if (!$('overlay-pause').hidden) {
+            e.preventDefault();
+            togglePause(false);
         }
     }
 }
@@ -447,6 +480,11 @@ function togglePause(force) {
     const ov = $('overlay-pause');
     if (paused) {
         lastFocused = document.activeElement;
+        // outside a run the same sheet is the settings dialog: run actions do not apply
+        const inRun = currentScreen === 'play' && !!session.getActive();
+        $('pause-h').textContent = inRun ? 'Paused' : 'Settings';
+        $('btn-resume-play').textContent = inRun ? 'Resume' : 'Close';
+        $('pause-run-actions').hidden = !inRun;
         ov.hidden = false;
         session.persistSnapshot();
         audio.suspendAudio();
@@ -585,7 +623,7 @@ function checkLessonProgress() {
         st.over = true;
         st.terminalReason = 'goal-reached';
         st.score.milestoneBonus += 100;
-        setTimeout(() => finishRun(), 300);
+        scheduleFinish(sess, 300);
         activeLesson = null;
         $('lesson-box').hidden = true;
     }
@@ -601,8 +639,8 @@ function loop(time) {
         session.advanceClock();
         if (sess.state.timeLimitMs > 0)
             updateAll();
-        if (sess.state.over && currentScreen === 'play') {
-            // timer-driven termination
+        if (sess.state.over && currentScreen === 'play' && !finishScheduled) {
+            // timer-driven termination (move-driven endings reveal on their own delay)
             finishRun();
         }
     }
@@ -627,8 +665,12 @@ function bindButtons() {
     $('btn-resume').addEventListener('click', () => {
         const sess = session.resumeSnapshot();
         if (sess) {
+            runFinished = false;
+            finishScheduled = false;
+            paused = false;
             setupBoard(sess.state);
             show('play');
+            fitCanvas();
             updateAll();
         }
     });
@@ -676,18 +718,38 @@ function restartRun() {
 }
 function leaveRun() {
     session.persistSnapshot();
+    stopCountdown();
     show('title');
     refreshTitle();
+}
+function applyRenderMode() {
+    const canvas = $('gl');
+    const board = $('dom-board');
+    if (settings.render3d && !glActive) {
+        // reuse an existing context when possible: a disposed canvas cannot be re-acquired
+        glActive = render.isReady() || render.initRender(canvas, { quality: settings.quality, reducedMotion: settings.reducedMotion });
+        if (!glActive)
+            announce('3D unavailable — using the accessible board view.');
+    }
+    else if (!settings.render3d && glActive) {
+        glActive = false;
+    }
+    canvas.hidden = !glActive;
+    board.classList.toggle('dom-primary', !glActive);
+    board.classList.toggle('dom-mirror', glActive);
 }
 function onSettingsChanged(s) {
     settings = s;
     session.saveSettings(s);
     ui.applySettingsToDom(s);
     audio.configureAudio(s);
+    applyRenderMode();
     render.updateQuality({ quality: s.quality, reducedMotion: s.reducedMotion });
     const sess = session.getActive();
-    if (sess)
+    if (sess) {
         setupBoard(sess.state);
+        fitCanvas();
+    }
     updateAll();
 }
 async function boot() {
@@ -701,17 +763,8 @@ async function boot() {
     document.addEventListener('keydown', onKey);
     document.addEventListener('pointerdown', () => audio.ensureAudio(), { once: true });
     // 3D init with graceful fallback
-    const canvas = $('gl');
-    glActive = settings.render3d && render.initRender(canvas, { quality: settings.quality, reducedMotion: settings.reducedMotion });
-    if (!glActive) {
-        $('dom-board').classList.add('dom-primary');
-        canvas.hidden = true;
-        if (settings.render3d)
-            announce('3D unavailable — using the accessible board view.');
-    }
-    else {
-        $('dom-board').classList.add('dom-mirror');
-    }
+    applyRenderMode();
+    fitCanvas();
     await syncServerTime();
     show('title');
     refreshTitle();
