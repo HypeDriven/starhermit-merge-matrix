@@ -1,6 +1,7 @@
 # SFX manifest — merge-matrix
 
 Generated with MOSS-SoundEffect v2.0, 48 kHz mono Opus (96 kbps VBR, loudness-normalized; 100 inference steps).
+Canonical source: `sfx/manifest.txt`. Generation entries: `sfx/manifest.json`.
 
 | file | event | prompt |
 |---|---|---|
@@ -17,3 +18,7 @@ Generated with MOSS-SoundEffect v2.0, 48 kHz mono Opus (96 kbps VBR, loudness-no
 | game-over.opus | gameOver | Slow descending two-tone synth phrase fading out, melancholy end of a run |
 | undo-whoosh.opus | undo | Quick reversed whoosh of time rewinding, airy backwards sweep |
 | achievement-fanfare.opus | achievement | Short achievement fanfare, bright bell ding followed by a sparkling glissando |
+| countdown-tick.opus | countdown | Short soft synthetic countdown beep, single warm sine blip with a light click attack |
+| countdown-go.opus | countdownGo | Bright rising two-note synth go signal, confident short swell, clean and dry |
+| hint-ping.opus | hint | Gentle glassy ping of a helpful hint appearing, soft bell with short shimmer tail |
+| best-flourish.opus | newBest | Short warm celebratory flourish for a new personal best, two rising bell notes with a soft sparkle |

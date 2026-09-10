@@ -1,0 +1,22 @@
+# Merge Matrix — canonical SFX manifest
+# file | event id | description of the sound | usage context
+# All clips: 48 kHz mono Opus (96 kbps VBR, loudness-normalized -20 LUFS), MOSS-SoundEffect v2.0, 100 steps.
+# Event ids are the keys of SAMPLE_MAP in src/audio.ts; every event also has a synth fallback.
+
+ui-tap.opus | uiMove | Short soft plastic UI button tap, dry, gentle, high-pitched click | Forward menu navigation (title -> modes/journey/learn/help), fired from show() in src/main.ts
+ui-back.opus | uiBack | Soft low UI back-navigation blip, short descending wooden tick | Any return to the title screen from a sub-screen
+move-tick.opus | ack | Quiet mechanical tick of a board game counter advancing, single clean click | Acknowledges every accepted slide before the slide body plays
+tile-slide.opus | slide | Smooth wooden tile sliding across a board surface, soft friction whoosh | The block travel itself, seeded pitch variant per move so replays sound identical
+merge-low.opus | merge | Two small wooden blocks knocking together into one, soft low thud with a light click | Merges producing a value below 64
+merge-mid.opus | merge | Medium ceramic tiles clacking and fusing together, warm rounded impact | Merges producing 64 to 511
+merge-high.opus | merge | Large glass tiles merging with a bright resonant chime and solid impact | Merges producing 512 to 2047
+merge-max.opus | merge | Huge crystal tiles fusing with a deep boom and a shimmering sparkle tail | Merges producing 2048 or more
+blocked-thud.opus | invalid | Dull rejected thud of a tile bumping against a wall, muted rubber bump | A direction that changes nothing, or an unavailable undo
+milestone-chime.opus | milestone | Rising four-note celebratory chime arpeggio on bells, triumphant and bright | Results screen when the goal tile was reached
+game-over.opus | gameOver | Slow descending two-tone synth phrase fading out, melancholy end of a run | Results screen when the run ended without the goal
+undo-whoosh.opus | undo | Quick reversed whoosh of time rewinding, airy backwards sweep | A successful undo
+achievement-fanfare.opus | achievement | Short achievement fanfare, bright bell ding followed by a sparkling glissando | One or more achievements unlocked on the results screen
+countdown-tick.opus | countdown | Short soft synthetic countdown beep, single warm sine blip with a light click attack | Each of the 3-2-1 countdown numbers before a run (skipped under reduced motion)
+countdown-go.opus | countdownGo | Bright rising two-note synth go signal, confident short swell, clean and dry | The moment the countdown clears and input opens
+hint-ping.opus | hint | Gentle glassy ping of a helpful hint appearing, soft bell with short shimmer tail | Hint button or H key reveals a suggested direction
+best-flourish.opus | newBest | Short warm celebratory flourish for a new personal best, two rising bell notes with a soft sparkle | Results screen when the total beats the stored best for that board and no achievement fanfare is already playing

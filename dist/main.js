@@ -97,6 +97,13 @@ async function loadLeaderboard() {
 /* ---------------- screens ---------------- */
 const SCREENS = ['title', 'modes', 'journey', 'learn', 'play', 'results', 'help'];
 function show(name) {
+    if (name !== currentScreen) {
+        // forward navigation taps, backward navigation blips
+        if (name === 'title' && currentScreen !== 'title')
+            audio.sfx.uiBack();
+        else if (currentScreen !== 'play')
+            audio.sfx.uiMove();
+    }
     currentScreen = name;
     for (const s of SCREENS)
         $(`screen-${s}`).hidden = s !== name;
@@ -240,6 +247,8 @@ function finishRun() {
     const cmp = $('res-compare');
     cmp.hidden = false;
     cmp.textContent = total > prevBest ? 'New personal best for this board.' : `Personal best here: ${prevBest}.`;
+    if (total > prevBest && newAch.length === 0)
+        audio.sfx.newBest();
     $('res-board-note').hidden = true;
     const nextBtn = $('btn-next');
     if (sess.mode === 'journey' && st.won) {
@@ -349,6 +358,7 @@ function doHint() {
     const box = $('hint-box');
     box.hidden = false;
     box.textContent = h ? `Try ${h.dir} — ${h.why}.` : 'No legal moves remain.';
+    audio.sfx.hint();
     announce(box.textContent);
 }
 function showInvalid(msg) {
@@ -376,14 +386,17 @@ function runCountdown(done) {
     let n = 3;
     el.hidden = false;
     el.textContent = String(n);
+    audio.sfx.countdown(n);
     countdownIv = setInterval(() => {
         n--;
         if (n <= 0) {
             stopCountdown();
+            audio.sfx.countdownGo();
             done();
             return;
         }
         el.textContent = String(n);
+        audio.sfx.countdown(n);
     }, 450);
 }
 /* keyboard */

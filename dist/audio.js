@@ -109,6 +109,10 @@ const SAMPLE_MAP = {
     gameOver: 'game-over',
     undo: 'undo-whoosh',
     achievement: 'achievement-fanfare',
+    countdown: 'countdown-tick',
+    countdownGo: 'countdown-go',
+    hint: 'hint-ping',
+    newBest: 'best-flourish',
 };
 const sampleState = new Map();
 const sampleBuffers = new Map();
@@ -197,6 +201,30 @@ export const sfx = {
             tone('fx', 990, 0.25, 'sine', 0.14, 0.1);
         }
         caption('achievement unlocked');
+    },
+    countdown(n) {
+        if (!playSample(SAMPLE_MAP.countdown))
+            tone('fx', 440 + n * 40, 0.08, 'sine', 0.14);
+        caption(`countdown ${n}`);
+    },
+    countdownGo() {
+        if (!playSample(SAMPLE_MAP.countdownGo)) {
+            tone('fx', 523.2, 0.12, 'triangle', 0.18);
+            tone('fx', 784, 0.18, 'sine', 0.14, 0.06);
+        }
+        caption('go');
+    },
+    hint() {
+        if (!playSample(SAMPLE_MAP.hint))
+            tone('fx', 880, 0.14, 'sine', 0.12);
+        caption('hint');
+    },
+    newBest() {
+        if (!playSample(SAMPLE_MAP.newBest)) {
+            tone('fx', 587.3, 0.16, 'triangle', 0.16);
+            tone('fx', 880, 0.28, 'sine', 0.14, 0.11);
+        }
+        caption('new personal best');
     },
 };
 function startAmbience() {

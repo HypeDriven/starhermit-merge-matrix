@@ -181,7 +181,7 @@ const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.txt': 'text/plain; charset=utf-8',
   '.svg': 'image/svg+xml', '.png': 'image/png', '.wasm': 'application/wasm',
-  '.opus': 'audio/ogg',
+  '.opus': 'audio/ogg', '.webp': 'image/webp', '.glb': 'model/gltf-binary',
 };
 
 function sendJson(res, code, obj) {
@@ -322,7 +322,7 @@ async function handle(req, res) {
   const rel = path.relative(ROOT, file);
   const segments = rel.split(path.sep);
   if (rel === '' || rel.startsWith('..') || path.isAbsolute(rel) ||
-      segments.some((s) => s.startsWith('.') || s === 'node_modules')) {
+      segments.some((s) => s.startsWith('.') || s === 'node_modules' || s === 'tests' || s === 'tools')) {
     return sendJson(res, 403, { error: 'forbidden' });
   }
   fs.readFile(file, (err, data) => {

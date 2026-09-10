@@ -29,7 +29,7 @@ const MIME = {
   '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml',
   '.png': 'image/png', '.ico': 'image/x-icon', '.wav': 'audio/wav', '.mp3': 'audio/mpeg',
   '.ogg': 'audio/ogg', '.opus': 'audio/opus', '.glb': 'model/gltf-binary',
-  '.woff2': 'font/woff2', '.ts': 'text/plain',
+  '.woff2': 'font/woff2', '.ts': 'text/plain', '.webp': 'image/webp',
 };
 
 const browserNoise = /GL Driver Message|GPU stall due to ReadPixels|Automatic fallback to software WebGL|EnableWebGLDeveloperExtensions/i;
@@ -248,7 +248,8 @@ async function runPass(browser, vpName, viewport, hasTouch) {
     });
 
     await step('play stage 1 to the 128 milestone via arrow keys', async () => {
-      const deadline = Date.now() + 120000;
+      // ~479 moves at the 120 ms input debounce; software-WebGL CI can need > 250 ms per move
+      const deadline = Date.now() + 300000;
       let moves = 0;
       for (;;) {
         if (await page.locator('#screen-results:not([hidden])').count()) break;

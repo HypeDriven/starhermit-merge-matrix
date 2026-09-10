@@ -1,261 +1,573 @@
-# Merge Matrix — Product and Game Specification
-
-**Document status:** design specification only; no implementation is included.  
-**Game index:** 18  
-**Genre:** Number merge puzzle  
-**Players:** 1 player; optional asynchronous score comparison  
-**Targets:** desktop browsers, mobile browsers, landscape and portrait where practical  
-**Rendering direction:** Three.js-first presentation with a fully usable semantic HTML interface layer
-
-## 1. Product vision
-
-Merge Matrix is a game in which players slide a square grid so equal values combine; reach milestones without exhausting empty cells. Its signature setting is a dark glass matrix with radiant number blocks. The product should feel immediately understandable, responsive within one input, and polished enough that the board or playfield itself is the visual hero. Sessions should begin quickly, make the next useful action obvious without solving the game for the player, and end with a clear explanation of score and progress.
-
-The experience must be original. Do not copy names, layouts, characters, iconography, writing, audio, progression maps, or level data from an existing title. Use an original visual language, original procedural assets, and internally authored content.
-
-### Design pillars
-
-1. **Readable before spectacular:** legal actions, hazards, selection, ownership, and goals remain legible with effects disabled.
-2. **One-input confidence:** every press, tap, drag, key, or pointer action gives immediate visual and sonic acknowledgment.
-3. **Short path to play:** a returning player reaches the primary playfield in at most two deliberate actions.
-4. **Fair mastery:** randomness is seeded and inspectable; outcomes never depend on hidden purchases or invisible stat boosts.
-5. **Scalable beauty:** the same art direction survives low-power mobile hardware and high-resolution desktop displays.
-
-## 2. Core game design
-
-### Objective and rules contract
-
-Slide a square grid so equal values combine; reach milestones without exhausting empty cells.
-
-The rules engine must represent legal actions independently from rendering. It must expose legal-action queries, deterministic resolution, serializable state, a monotonically increasing turn/tick number, and a terminal-state reason. Tutorials and hints call the same legal-action API used by play rather than duplicating rules.
-
-### Core loop
-
-The repeated loop is: **choose a direction, move every tile, combine equal values once, add a seeded new tile, and reassess**. Input is locked only during the shortest non-interruptible resolution phase. Cosmetic animation may continue after the logical state is ready, but skip/fast-forward must settle every object into the exact deterministic end state.
-
-### Scoring and victory
-
-Score merged values; daily challenges use a shared deterministic seed. Results show a component breakdown rather than one unexplained total. Store integers for score and simulation units; format values only in presentation. Ties use, in order: primary objective completion, fewer invalid actions, lower authoritative elapsed time, then stable session identifier.
-
-### Modes
-
-- **Learn:** interactive lessons introduce one rule at a time and require the player to perform the action.
-- **Journey:** authored progression with gradually combined mechanics and periodic mastery stages.
-- **Daily:** one shared seed and ruleset per UTC day, synchronized to platform time.
-- **Practice:** selectable difficulty, restart, undo where rules permit, and no effect on competitive rating.
-- **Challenge:** constrained goals such as move limits, speed targets, altered layouts, or restricted tools.
-- **Score chase:** asynchronous global and friends comparisons using validated seeds and rulesets.
-
-### Difficulty and content generation
-
-- Represent content as versioned data: identifier, seed, initial state, goals, allowed mechanics, par values, tutorial flags, and presentation theme.
-- Run offline validators to prove basic legality, reachable goals, bounded duration, and absence of soft locks. Logic puzzles additionally require a unique or explicitly accepted solution class.
-- Difficulty is measured from solution depth, branching factor, time pressure, motor precision, hidden information, and recovery options—not merely larger numbers.
-- Introduce one new concept in isolation, combine it with one known concept, then test mastery before adding another.
-- Daily seeds are immutable after publication. If content is defective, mark the day excluded from ranking rather than silently replacing it.
-
-### Game-state model
-
-`boot → title → profile-ready → mode-select → preparing → tutorial/countdown → active ↔ paused/reconnecting → resolving → results → progression`.
-
-Every transition has one owner and an explicit reason. Backgrounding pauses solo simulation. In hosted play, the authoritative clock continues where rules require it, while the returning client receives a fresh snapshot and a concise “while you were away” summary.
-
-## 3. Interaction and user-interface design
-
-### Information hierarchy
-
-1. **Primary:** playfield, current objective, legal interaction target, and immediate danger or turn state.
-2. **Secondary:** score/progress, remaining moves or time, opponent/party status where applicable.
-3. **Tertiary:** settings, social controls, cosmetics, help, and history.
-
-The Three.js canvas fills the game region but is never the only UI. Menus, text, forms, chat, settings, and assistive descriptions use semantic HTML over or beside the canvas. Maintain a single shared layout model so DOM labels align with projected Three.js targets.
-
-### Responsive layouts
-
-- **Wide desktop (≥1024 CSS px):** centered playfield, objective/progression rail on the left, contextual actions and social/status rail on the right. Maximum line length is 70 characters.
-- **Compact desktop/tablet:** playfield remains central; secondary rails collapse into drawers. Pointer hover may preview but never be required.
-- **Portrait mobile:** top safe-area status bar, square or perspective-fit playfield, bottom thumb-zone action tray, and sheet-based secondary panels. Never place critical controls under browser chrome or display cutouts.
-- **Landscape mobile:** reserve a narrow status rail; preserve at least 44×44 CSS-pixel targets and 8-pixel separation.
-- React to resize, orientation, device-pixel-ratio, safe-area insets, virtual keyboard, and visibility changes without losing input or restarting the round.
-
-### Screens and overlays
-
-- **Title/home:** Play is dominant; daily challenge, journey progress, and profile are one level below.
-- **Mode setup:** show rules, expected duration, player count, assists, and whether the result is ranked before commitment.
-- **Play HUD:** objective, progress, current actor/state, pause, and only context-relevant actions.
-- **Pause/settings:** resume first; audio, graphics, controls, accessibility, help, and leave are clearly separated.
-- **Results:** outcome headline, score breakdown, progress, achievements, comparison, replay/retry, and next recommended action.
-- **Help:** visual rule cards generated from current control mappings and representative legal states.
-- Daily challenge, local practice, pause, resume, results, and progression are first-class screens.
-
-### Input
-
-- Pointer/touch: raycast only against explicit interaction layers; use pointer capture for drags; cancel safely on lost capture.
-- Touch: distinguish tap, drag, and camera gesture by distance/time thresholds; never require multi-touch for core play.
-- Keyboard: directional navigation among legal targets, confirm, cancel, pause, undo/hint where valid, and camera reset.
-- Gamepad: focus navigation, primary/secondary actions, pause, and remappable axes/buttons.
-- Prevent accidental double commits with action identifiers, not arbitrary long debounce timers. Provide visible drag origin, target preview, and invalid-action explanation.
-
-### Accessibility
-
-- Full keyboard operation and visible focus; DOM equivalents for canvas controls; headings and live regions for objective, turn, score, errors, and results.
-- Color is reinforced by shape, texture, icon, or label. Include contrast-safe and common color-vision palettes.
-- Reduced-motion mode removes camera swoops, shake, parallax, rapid particles, and large scaling while preserving event timing.
-- Independent sliders for music, effects, ambience, and voice; captions/text cues for meaningful audio; no audio-only gameplay.
-- Options for larger text, high contrast, left-handed controls, hold-versus-toggle, timing assistance, haptics off, and tutorial replay.
-- Announce Three.js board state through a concise navigable model rather than describing every decorative object.
-
-## 4. Visual and audio design
-
-### Visual contract
-
-The subject is the active playfield at near-tabletop to room scale, framed so state changes occupy most of the screen. The scene is a dark glass matrix with radiant number blocks. Use an authored camera, original procedural geometry, restrained environmental storytelling, and a deterministic visual seed. The no-post-processing baseline must still communicate hierarchy, depth, selection, and state.
-
-### Three.js scene design
-
-- Use physically based lighting and color management with one dominant key, soft environment fill, and contact grounding. Gameplay colors are tested after tone mapping.
-- Build reusable semantic meshes for active pieces, board cells, obstacles, targets, and environment modules. Geometry detail follows silhouette importance and camera distance.
-- Use instancing for repeated pieces and props, pooled effects, texture atlases where appropriate, and explicit disposal on scene changes.
-- Separate render layers for environment, gameplay, selection/ghosts, effects, and UI anchors. Cosmetic particles never intercept raycasts.
-- Selection uses a combination of lift/pose, outline or rim, and grounded marker—not bloom alone. Legal targets preview before commit; invalid targets explain why.
-- Event hierarchy: input acknowledgment < legal move < combo/goal < round completion. Reserve camera motion, strong emission, and dense particles for the highest tier.
-- Audio uses original short transients tied to logical events, layered material impacts, quiet ambience, and adaptive music stems. Randomized pitch/variant is seeded for replay consistency where recording matters.
-
-### Camera and motion
-
-- Choose orthographic or low-distortion perspective according to depth requirements; expose framing constants rather than magic offsets.
-- Camera transitions use authored duration/easing or critically damped springs and remain interruptible. Never animate by cumulative per-frame lerp.
-- Decorative motion is paused or reduced when hidden. Gameplay animation derives from simulation state and interpolation alpha, not frame count.
-- Camera shake is low-amplitude, event-tiered, disabled by reduced motion, and never changes raycast truth.
-
-### Graphics-skill routing
-
-During implementation, begin with `threejs-skill-router` and load only the following retained skills because they materially affect this visual target:
-
-- `threejs-camera-direction` for deliberate framing and input-safe camera transitions
-- `threejs-procedural-geometry` for authored, inspectable meshes instead of primitive-only placeholders
-- `threejs-procedural-materials` for coherent PBR surfaces, perceptual parameters, and readable state masks
-- `threejs-procedural-animation` for deterministic motion phases, springs, and interruption-safe transitions
-- `threejs-procedural-vfx` for bounded particles, trails, impact accents, and event hierarchy
-- `threejs-exposure-color-grading` for tone mapping, adaptation limits, and accessible color separation
-- `threejs-image-pipeline` for explicit depth/color ownership and pass ordering
-- `threejs-visual-validation` for fixed-view captures, seed sweeps, and performance evidence
-
-Follow the skill pack's acceptance gate: deterministic seeds, debug views for controlling fields, perceptually grouped parameters, mechanism-backed quality tiers, and a readable no-post baseline. Do not add an effect merely because a skill exists.
-
-### Performance budgets
-
-- Target 60 fps at the default tier and a stable 30 fps fallback on constrained mobile hardware.
-- Default active gameplay: ≤150 draw calls desktop, ≤90 mobile; ≤350k visible triangles desktop, ≤140k mobile; transient particles ≤20k desktop and ≤5k mobile.
-- Cap device pixel ratio by quality tier; dynamically lower render scale before dropping simulation rate. UI text remains native resolution.
-- Avoid runtime shader compilation during active play by prewarming required variants. Avoid per-frame allocations in simulation/render loops.
-- Quality tiers independently control shadows, environment detail, particles, post effects, antialiasing, and render scale; they never alter rules or visibility of hazards.
-
-## 5. Technical architecture
-
-### Client modules
-
-- `bootstrap`: host handshake, capability detection, asset manifest, lifecycle.
-- `rules`: pure deterministic state transitions, legality, scoring, seeded random stream.
-- `session`: local or hosted commands, snapshots, prediction policy, reconnect, replay.
-- `render`: Three.js scene graph, semantic entity views, camera, lighting, VFX, quality.
-- `ui`: responsive DOM shell, focus, localization, settings, overlays, accessibility mirror.
-- `audio`: buses, event mapping, focus/background behavior, decode and memory policy.
-- `content`: versioned levels, themes, tutorials, validation metadata.
-- `platform`: token-aware REST/WebSocket adapter, retries, rate-limit handling, telemetry consent.
-
-No module may mutate rules state except through a validated command. Rendering consumes immutable snapshots plus interpolation data. UI state and simulation state are separate so closing a drawer cannot affect a match.
-
-### Determinism, replay, and security
-
-- Fixed simulation step where physics exists; quantize authoritative inputs and define stable collision/order rules.
-- Use separate seeded random streams for rules, content decoration, and audiovisual variants. Cosmetic randomness never changes rules.
-- Replay envelope: schema version, build/content version, seed, initial hash, timestamp offset, ordered commands, periodic state hashes, terminal result.
-- Validate all network input for identity, session membership, turn/tick, bounds, rate, payload size, and legal action. Reject duplicates idempotently by command ID.
-- Treat client clocks, scores, inventories, roles, physics outcomes, and completion claims as untrusted in competitive contexts.
-
-### Loading and resilience
-
-- Show useful progress by asset group; load core rules/UI first and scenic assets lazily. Provide procedural low-detail substitutes if optional assets fail.
-- Cache immutable hashed assets and the last safe local snapshot. Updates activate between rounds, never during one.
-- Recover WebGL context by rebuilding GPU resources from retained CPU descriptors. If 3D is unavailable, present a clear compatibility message and preserve account/session state.
-- Background tabs reduce rendering to zero or a low heartbeat while preserving required network lifecycle.
-
-## 6. StarHermit integration
-
-### Packaging and launch
-- Ship a browser distribution with `starhermit.txt` at its root, `name=Merge Matrix`, and `launch=index.html`. Keep source files, secrets, design documents, and source maps outside the uploaded distribution.
-- Read the game scope from the short-lived launch token rather than hard-coding a slug. Use same-origin `/api` and `/ws` routes when hosted. Refresh account tokens through the host shell; never persist access or launch tokens in local storage.
-- Synchronize countdowns and daily boundaries with `GET /api/v1/time` using round-trip-adjusted offset. Treat rate limits and structured `{"error":"..."}` responses as recoverable UI states.
-
-### Identity, profile, presence, and preferences
-- Support guest practice locally, then offer account sign-in for durable progress. Use the profile display name and avatar only where identity is useful, honor profile privacy, and send throttled presence heartbeats while actively playing.
-- Store accessibility, audio, graphics tier, tutorial completion, camera preference, and rules options through per-game settings. Declare desktop action bindings and read player overrides; touch mappings remain responsive UI controls.
-- Cloud-save progression as a versioned, checksummed document. Resolve conflicts by preserving both snapshots and asking the player when neither is a strict descendant. Never place credentials or private chat in saves.
-
-### Discovery, activity, and social layer
-- Start and end launch activity so playtime is accurate. Surface entitlement or catalog state only in host-owned chrome; the game itself must remain playable without promotional interruption.
-- Provide a compact friends panel for score comparison and invitations where appropriate. Respect presence visibility and do not expose a hidden or private profile through game UI.
-- Do not create gameplay chat or voice surfaces for the initial release; they are not relevant to the core solo loop. Friends-only leaderboard filtering and shareable challenge seeds supply the social layer without unnecessary communication permissions.
-
-### Achievements and leaderboards
-- Declare a small static achievement set: first completion, mechanic mastery, a sustained streak, a difficult content milestone, and an accessibility-neutral long-term goal. Keys are stable, lowercase identifiers; unlocks are idempotent.
-- Provide global and friends-filtered boards for the primary metric plus a fair daily/weekly board. Include ruleset, content version, seed, assists, and duration with every submission; reject impossible or stale-version scores.
-- For globally competitive boards, validate score claims through a lightweight authoritative script using replayable input logs and deterministic seeds. If validation is unavailable, label the board casual and apply plausibility/rate checks.
-
-### Sessions and transport
-- The initial game is solo. Use an authoritative JavaScript Game Script only for seeded daily sessions, replay validation, and durable achievement delivery; ordinary practice can run locally and offline after initial load.
-- A daily session records content version, seed, settings affecting difficulty, an ordered input log, score components, and final checksum. Reconnect from the durable session snapshot rather than trusting cached client state.
-- Realtime rooms, peer relay, matchmaking, backfill, and voice are intentionally not used because they add no value to this ruleset.
-
-### Publishing and operations
-- Keep the authoritative script inside the distribution and declare it with `server=server.js`. Choose a digest-pinned container only if profiling proves the sandbox unsuitable; no initial design here requires one.
-- Define control defaults, achievement metadata, and versioned settings before release. Publish immutable build assets, verify the launch path, maintain migration tests for saves, and expose no secret configuration to the client.
-- Capture anonymous funnel events only for start, tutorial step, round end, retry, settings change, and error category. Avoid raw text, precise personal data, and cross-title tracking.
-
-## 7. Content, economy, and retention
-
-- Launch scope: tutorial sequence, at least 40 authored stages or equivalent procedural depth, daily challenge, practice, five visual themes, and a mastery track.
-- Cosmetic rewards may alter materials, trails, board surrounds, ambience, or profile flourishes, but never hitboxes, timing windows, information, or power.
-- Reward cadence: early feedback every session, meaningful unlock every 3–5 sessions, and long-term goals visible without manipulative countdowns.
-- No real-money wagering, paid random rewards, forced advertising, energy pressure, punitive streak loss, or purchases that affect competitive outcomes.
-- Notifications, if ever added by the host, are opt-in, frequency-capped, quiet-hour aware, and never use false urgency.
-
-## 8. Analytics and privacy
-
-Measure tutorial completion, first meaningful action time, session duration bands, level attempts, quit state, input modality, performance tier, reconnect success, and accessibility feature usage only in aggregate. Use random session identifiers, short retention, and explicit consent where required. Never collect message content, drawings, voice, private board notes, or exact pointer trails as analytics.
-
-Success targets for the first public test: median first-play time under 20 seconds, tutorial completion above 80%, crash-free sessions above 99.5%, p95 input acknowledgment below 100 ms locally, and at least 95% of supported mobile sessions holding their selected frame-rate tier.
-
-## 9. Testing and acceptance criteria
-
-### Rules and content
-
-- Unit-test every legal action, invalid-action reason, scoring component, terminal state, and serialization migration.
-- Property-test deterministic replay: the same version, seed, and commands produce identical state hashes.
-- Fuzz malformed commands and generated content; prove no hangs, NaN physics, impossible mandatory states, or unbounded loops.
-- Golden-test representative easy, medium, hard, interrupted, resumed, and terminal sessions.
-
-### Interface and accessibility
-
-- Test pointer, coarse touch, keyboard-only, gamepad, screen reader, zoom to 200%, reduced motion, high contrast, safe areas, and both mobile orientations.
-- Verify focus restoration after every modal, meaningful live announcements, no keyboard traps, and no hover-only instructions.
-- Confirm all critical labels fit translated strings at 30% expansion and support right-to-left layout where localized.
-
-### Graphics and performance
-
-- Produce fixed-camera captures for every quality tier, deterministic seed sweeps, no-post baselines, debug-view mosaics, and 10-minute temporal stability runs.
-- Profile CPU, GPU, memory, shader compilation, draw calls, triangles, texture memory, and garbage collection on representative desktop and mobile classes.
-- Verify effects cannot obscure legal targets, alter picking, leak resources, or continue expensive updates while hidden.
-
-### Platform and network
-
-- Test expired/rotated tokens, privacy settings, rate limits, offline start, reconnect at each game state, duplicate commands, out-of-order events, server restart, and version mismatch.
-- Verify achievement idempotency, leaderboard validation, friends-only filtering, cloud-save conflict handling, activity start/end pairing, and server-time countdown accuracy.
-- For hosted sessions, test disconnect/rejoin, abandonment, timeout, invitation expiry, result reconciliation, replay access, moderation controls, and authoritative cheat attempts.
-
-## 10. Definition of done and non-goals
-
-This specification is ready for implementation when rules examples, content schema, wireframes for all responsive breakpoints, visual target frames, accessibility annotations, authoritative message schema, achievement definitions, leaderboard definitions, and performance test devices are approved.
-
-This document does **not** authorize implementation, asset production, monetization work, native wrappers, real-money systems, or copying any existing product. The initial build should favor one excellent core loop and a coherent original visual identity over feature breadth.
+# Merge Matrix — Game Design Document (running spec)
+
+This document describes the game as it ships today. Present tense means implemented and
+reachable from the UI. Anything deliberately designed but not yet built is confined to
+§17 "Design intent not yet implemented".
+
+---
+
+## 1. Overview
+
+**Pitch.** Slide a glass matrix, fuse equal blocks, and push one signal deeper than the
+grid can hold — with a seeded board that anyone can replay move for move.
+
+| Field | Value |
+|---|---|
+| Genre | Deterministic slide-and-merge number puzzle (2048 lineage, seeded/verified) |
+| Players | 1, with asynchronous daily comparison |
+| Session length | 3–6 min (lesson or challenge), 8–20 min (2048 practice run) |
+| Platforms | Desktop and mobile browsers; portrait and landscape |
+| Rendering | Three.js WebGL board (`vendor/three.module.js`) over an authoritative DOM grid mirror; the DOM board is the interaction and accessibility layer and takes over whenever WebGL is off or unavailable |
+| Build | TypeScript in `src/` compiled by `tsc` to `dist/` (ES modules, no bundler) |
+
+### File map
+
+| Path | Responsibility |
+|---|---|
+| `index.html` | All seven screens, the pause/settings sheet, live regions; loads `dist/main.js` |
+| `style.css` | Palette tokens, screen layouts, responsive/compact rules, safe-area insets |
+| `src/rules.ts` | Pure rules engine: board, slide/merge, scoring, RNG, undo, replay envelope, daily seed |
+| `src/content.ts` | Versioned content: 5 themes, 3 lessons, 40 journey stages, 5 achievements, offline stage validator |
+| `src/session.ts` | Active session, settings/progress/snapshot persistence, achievement evaluation, clock |
+| `src/main.ts` | Boot, screen state machine, input routing (keys/pointer/gamepad), results, `/api` client |
+| `src/ui.ts` | DOM board build/render, ARIA labels, settings form binding, help cards, hint text |
+| `src/render.ts` | Three.js scene: tile meshes, label textures, camera framing, merge pulse, glow/shake |
+| `src/audio.ts` | Three buses, authored `sfx/*.opus` one-shots with synthesis fallback, adaptive music |
+| `server.js` | StarHermit game script: static host + `/api/v1` time, daily, replay-validated submit, leaderboard |
+| `tests/rules.test.ts` | 21 vitest cases over rules + content |
+| `tests/e2e.mjs` | Playwright-core playthrough of the real UI at desktop and mobile |
+| `sfx/` | 17 Opus clips, `manifest.txt` (canonical), `manifest.json` (generator), `manifest.md` |
+| `assets/` | FLUX key art used by the title and results screens |
+| `coverart.png`, `icon.png`, `favicon.svg` | Platform art |
+
+---
+
+## 2. Vision and design pillars
+
+**1. The board is provable.** Every run is a seed plus an ordered list of four directions.
+`buildReplay`/`verifyReplay` re-derive every intermediate state hash, and the server refuses a
+daily score it cannot reproduce. *Rules in:* seeded spawns, a state hash on the results screen,
+server-side replay validation. *Rules out:* any hidden difficulty adjustment, any bonus the
+client alone can mint, cosmetic randomness that touches simulation state.
+
+**2. One direction, one whole thought.** A move resolves the entire grid at once; there is no
+sub-turn, no selection, no aim. *Rules in:* four inputs plus undo/hint/pause, a 120 ms
+per-direction debounce, gamepad and swipe parity. *Rules out:* drag-a-single-tile mechanics,
+timed reflex inputs outside the one explicit Speed challenge.
+
+**3. Glass you can still read.** The WebGL board is the hero, but the number on a tile is the
+information; the DOM mirror carries the same numbers and ARIA labels at all times.
+*Rules in:* per-value label textures baked at 256², a top-face-only number, high-contrast and
+3D-off switches that never change the rules. *Rules out:* value encoded only by hue, effects
+that occlude a tile face, motion that must finish before the next input is accepted.
+
+**4. Teach by requiring the action.** Lessons complete when the player performs the thing
+being taught — three slides, one merge, a 32 tile — not when they dismiss a panel.
+*Rules in:* the three-lesson Learn track, forty journey stages on a teach → combine → test
+arc, contextual hints on demand. *Rules out:* modal tutorial walls, forced tutorial on boot.
+
+**5. A run should end with an explanation.** Results itemise merge points, milestone bonus and
+efficiency bonus with the seed and replay hash next to them. *Rules out:* an unexplained total,
+a leaderboard entry the player cannot reconstruct.
+
+---
+
+## 3. Player experience
+
+**Target player.** Someone who already knows the slide-and-merge idiom and wants either a
+five-minute constrained puzzle or a long 2048 climb they can compare against a shared board.
+
+**First 60 seconds.** Boot lands on the title with the key-art hero and six choices, `Play`
+focused first. *How to play* opens seven generated cards (slide, merge, new blocks, scoring,
+losing, controls, seeds) before any commitment. *Learn* offers three lessons whose text states
+the exact completion condition; the first is satisfied by three legal slides. From a cold start
+the shortest path to a moving board is two clicks (`Journey` → stage 1, or `Play` → `Start`),
+and every run opens with a 3-2-1 countdown (skipped under reduced motion) that also gives the
+audio a first gesture-unlocked beat.
+
+**Session shape.** Title → mode or stage → countdown → a stream of directional inputs with
+undo/hint available where the mode allows → terminal state → results with breakdown, personal
+best comparison, achievements, and `Retry` / `Next stage` / `Menu`. Leaving mid-run persists a
+snapshot; the title then offers `Resume run`.
+
+**Emotional beat.** The moment a long-tended corner column collapses in one direction and the
+board's largest number doubles — carried by the four-stage merge sample set, the camera glow
+pulse, and the tile pop.
+
+---
+
+## 4. Core loop and rules contract
+
+Owner of all of this: `src/rules.ts` (mirrored for validation in `server.js`).
+
+### Board and entities
+
+* `board: number[][]`, `size × size`, `0` = empty. Size is clamped to 2–8 (`createGame`);
+  the UI exposes 3, 4 and 5.
+* Two starting tiles are spawned from the seeded stream before the first input.
+* `GameState` also carries `moves`, `score` (3 components), `invalidActions`, `rngState`,
+  `won`, `over`, `terminalReason`, `maxTile`, `undoStack` (≤ 64), `log`, `elapsedMs`.
+
+### Legal actions
+
+`up`, `down`, `left`, `right` (`DIRS`), plus `undo` where `allowUndo` is set. A direction is
+legal only if it changes the board: `legalMoves()` filters `DIRS` by `peekMove().changed`.
+
+### Resolution order (`applyMove`)
+
+1. Reject if `over` (`game-over`), if the direction is not in `DIRS` (`bad-direction`), or if
+   `moveLimit > 0 && moves >= moveLimit` (`move-limit`).
+2. `peekMove` slides every line toward the move direction. Per line (`slideLine`): drop zeros,
+   then scan forward merging a pair of equal neighbours into their double — **each tile merges
+   at most once per move** — then pad with zeros.
+3. If nothing changed: `invalidActions++`, return `no-move`. No tile spawns, no turn is spent.
+4. Push an undo snapshot (board, score, `rngState`, `moves`, `maxTile`) when undo is allowed.
+5. Commit the board, add the sum of merged values to `score.mergePoints`.
+6. Spawn one tile into a uniformly chosen empty cell: `2` with p=0.9, `4` with p=0.1, drawn
+   from the run's `Rng` (mulberry32 over a single uint32 state, so the whole RNG serialises).
+7. `moves++`, append a `MoveRecord` (dir, gained, merge value/count pairs, spawn cell/value).
+8. If `maxTile >= goalTile` and not already won: set `won`, add `goalTile * 10` to
+   `milestoneBonus`, and if `moveLimit > 0` add `(moveLimit - moves) * 25` to `efficiencyBonus`.
+9. `checkTerminal`.
+
+### Scoring
+
+```
+total = mergePoints + milestoneBonus + efficiencyBonus      (rules.ts: scoreTotal)
+mergePoints      = Σ value of every tile produced by a merge
+milestoneBonus   = goalTile × 10, once, on first reaching the goal
+efficiencyBonus  = max(0, moveLimit − moves) × 25, only in move-limited modes
+```
+
+*Worked example — Journey stage 1 (`seed 1000`, 4×4, goal 128), the exact run the e2e test
+produces:* 479 moves of merges accumulate `mergePoints = 6864`; reaching 128 adds
+`128 × 10 = 1280`; the stage is unlimited so `efficiencyBonus = 0`; **total 8144**, shown as
+three rows plus a bold total, with `seed 1000 · replay hash ec62f5cf` beneath.
+
+### Terminal states (`checkTerminal`, `tick`)
+
+| Condition | `over` | `terminalReason` | Results headline |
+|---|---|---|---|
+| `moveLimit` reached | yes | `move-limit-exhausted` (or `goal-reached` if won) | "Out of moves" |
+| No legal direction | yes | `board-full` (or `goal-reached`) | "Matrix full — run over" |
+| `elapsedMs >= timeLimitMs` | yes | `time-expired` (or `goal-reached`) | "Time expired" |
+| Goal reached, run continues | no | — | play continues; ending later reports `goal-reached` |
+
+Reaching the goal does **not** end the run: `won` is latched and play continues until one of
+the three terminal conditions fires. Results headline reads `Milestone reached — <goal>!`
+whenever `won`.
+
+### Tie-breaks (server leaderboard, `server.js`)
+
+`score` desc → `invalidActions` asc → `elapsedMs` asc → stable session id.
+
+### RNG, determinism, replay
+
+One `Rng` per run; its `state` lives inside `GameState`, so a serialized snapshot resumes with
+an identical future. `stateHash` is an FNV-1a mix of size, moves, rngState, total, maxTile,
+over-flag and every cell. `buildReplay(opts, commands)` re-simulates from the seed and records
+a hash after each command; `verifyReplay` re-runs and rejects on the first mismatch, on a
+rules-version mismatch, or on a differing terminal reason/score.
+
+### Undo and hints
+
+`undo()` pops the snapshot, restores state, drops the last log entry, and recomputes `won` from
+`maxTile`. It is refused after game over and in modes with `allowUndo: false` (Daily, Score
+chase, Speed challenge, Journey mastery stages). `ui.computeHint` scores every legal direction
+by `gained × 100 + resulting empty cells` and names the winner ("Try up — frees 14 cells with
+the best immediate merges"); it uses the same `peekMove` the rules use, never a private oracle.
+
+---
+
+## 5. Modes and progression
+
+| Mode | Content id | Board | Goal | Constraint | Undo | Ranked |
+|---|---|---|---|---|---|---|
+| Learn (3 lessons) | `lesson-slide` / `-merge` / `-survive` | 4×4 | 64 / 64 / 32 | completion condition per lesson | yes | no |
+| Journey (40 stages) | `j01`…`j40` | 4×4, 5×5 late | 128→4096 | move limit on some | no on mastery stages | no |
+| Daily | `daily-YYYY-MM-DD` | 4×4 | 2048 | none | **no** | yes (server-validated) |
+| Practice | `practice-<goal>-<size>` | 3×3, 4×4, 5×5 | 512/1024/2048/4096 | none | yes | no |
+| Challenge — moves | `challenge-moves` | 4×4 | 512 | 60 moves | yes | no |
+| Challenge — moves hard | `challenge-moves-hard` | 4×4 | 1024 | 100 moves | yes | no |
+| Challenge — speed | `challenge-speed` | 4×4 | 256 | 120 s | **no** | no |
+| Challenge — wide | `challenge-wide` | 5×5 | 2048 | none | yes | no |
+| Score chase | `score-chase` | 4×4, seed 90210 | 4096 | none | **no** | flagged ranked |
+
+**Journey curve** (`content.journeyStages`): stage `i` (0-based) sits in band
+`floor(i/8)`; band goals are `[128, 256, 512, 1024, 2048]`. Every 8th stage is a **mastery**
+stage: goal doubled, undo disabled, drawn with an accent border. From band 2, every third stage
+adds a move limit of `par + 20` where `par = 40 + band·30 + (size−4)·30`. In band 4 the odd
+stages widen the board to 5×5. Seeds are `1000 + i·7919`; the theme cycles through the five
+themes by `i % 5`. Stage completion is stored by index in `progress.journeyCompleted`, and the
+journey grid marks completed cells and exposes name/goal/size/limit/theme in `aria-label`.
+
+**Daily.** `dailySeed('YYYY-MM-DD')` is an FNV-1a hash of `merge-matrix-daily:<day>`, identical
+in client and server, so every player gets the same board. The client syncs to `/api/v1/time`
+at boot so the day rolls over on platform time.
+
+**Achievements** (`content.ACHIEVEMENTS`, granted in `session.evaluateAchievements`, idempotent
+per key with an unlock timestamp): First Light (first win), Matrix Adept (mastery stage),
+Seven-Day Circuit (7 distinct daily days), Deep Signal (a 4096 tile), Long Haul (20 stages).
+
+**Content validation.** `validateStage` runs offline in the test suite: every stage must have
+sane fields, a legal first move, and must be driven to its goal (or a legitimate move-limit
+ending) by a rotating deterministic policy inside 4000 simulated moves.
+
+---
+
+## 6. Controls and interaction
+
+| Input | Desktop | Mobile | Gamepad |
+|---|---|---|---|
+| Slide | ↑ ↓ ← → or W A S D | swipe on the board (≥ 24 px) | d-pad, or left stick past ±0.6 |
+| Undo | `Z` / `Undo` button | `Undo` button | — |
+| Hint | `H` / `Hint` button | `Hint` button | — |
+| Pause / settings | `P` or `Esc`, `⏸`, `⚙` | `⏸`, `⚙` | Start or B |
+| Restart / leave | rail buttons and pause sheet | same | — |
+| Navigate menus | Tab + Enter/Space | tap | — |
+
+**Input locking.** Directions are ignored unless `currentScreen === 'play'` and not paused.
+Each direction is keyed as `<moves>:<dir>` and debounced for 120 ms, so a held key or a double
+tap cannot double-commit a turn. Key handling is skipped while focus is in an `input`,
+`select`, or `textarea`. Swipes use pointer capture with a `pointercancel` reset; a gesture
+shorter than 24 px is a tap and moves nothing. Backgrounding the tab auto-pauses a run.
+
+**Feedback for every input.** Accepted move → tick + slide sample, DOM/3D board update, HUD
+score/moves refresh, a screen-reader announcement including a board summary, and a 10 ms
+vibration when haptics are on. Merge → a merge sample chosen by value tier, a tile pop, and a
+glow pulse proportional to points gained. Illegal direction → `blocked-thud`, a red warning
+panel naming the direction, and an assertive live announcement. Undo → whoosh. Hint → ping.
+
+---
+
+## 7. Screens and UI flow
+
+`SCREENS = ['title','modes','journey','learn','play','results','help']`; `show()` hides all but
+one, toggles the pause button, and focuses the first control on the new screen.
+
+```
+boot → title ─┬─ help ────────────────► title
+              ├─ modes → mode-setup → play
+              ├─ journey (40 cells) ──► play
+              ├─ learn (3 lessons) ───► play
+              ├─ daily ───────────────► play
+              └─ resume snapshot ─────► play
+play ↔ overlay-pause (also the settings sheet from any screen)
+play → results → retry | next stage | menu
+```
+
+**Desktop play layout.** Three columns, `220px | 1fr | 220px`: objective + lesson box on the
+left, board centre, action rail + hint/warning/leaderboard on the right. The left-handed
+setting swaps the two rails via grid areas.
+
+**Mobile portrait (≤ 1023 px).** Rails collapse to horizontal rows above and below the board;
+the action rail keeps `padding-bottom: calc(0.3rem + var(--safe-bottom))`.
+
+**Mobile landscape.** Rails return to narrow vertical columns capped at 140 px so the board
+keeps the vertical space.
+
+**Never cut off:** the top bar's score/best/moves/timer (it wraps rather than clipping), the
+whole board (the 3D camera retreats and tilts toward overhead as aspect narrows;
+`buildDomBoard` sizes the DOM grid with `min(92vw, 92dvh − 220px, size·96px)`), the primary
+action of any screen, and the pause sheet (`max-height: calc(100dvh − 2rem)` with its own
+scroll). All screens pad by `env(safe-area-inset-*)`.
+
+---
+
+## 8. Art direction
+
+**Palette** — five themes in `content.THEMES`, applied to both CSS custom properties and the
+Three.js materials:
+
+| Theme | bg | grid | cell | accent | Character |
+|---|---|---|---|---|---|
+| Dark Matrix (default) | `#0a0e1a` | `#131b2e` | `#1d2942` | `#41d9c0` | Cool navy glass, cyan-to-magenta value ramp |
+| Ember Glass | `#170d0a` | `#241310` | `#331b16` | `#ffb84d` | Warm coal and amber |
+| Verdant Circuit | `#0a140d` | `#11241a` | `#183325` | `#5ee6a8` | Green board-trace |
+| High Contrast | `#000000` | `#111111` | `#222222` | `#ffffff` | Forced by the high-contrast setting |
+| Light Paper | `#e8e6df` | `#d4d1c6` | `#c2beb1` | `#3056a3` | The only light theme; dark text |
+
+Value ramp (Dark Matrix): 2 `#22407a`, 4 `#2b5cb8`, 8 `#3f8cff`, 16 `#37b6ff`, 32 `#41d9c0`,
+64 `#5ee6a8`, 128 `#ffe066`, 256 `#ffb84d`, 512 `#ff8c5a`, 1024 `#ff5a7a`, 2048 `#e14dff`,
+4096 `#9d5cff` — cold to hot as the number grows; anything above the table reuses the top
+colour. Danger `#ff5a7a`, muted text `#9aa7c4`.
+
+**Shape language.** Squares with generous radii: 10 px cells, 12 px buttons, 14 px cards and
+panels, 18 px sheets. In 3D, tiles are `0.86 × 0.30 × 0.86` boxes on `0.96 × 0.12 × 0.96` cell
+pads over a slab, lit by a directional key, a blue-tinted ambient, and a moving point light.
+
+**Typography.** System UI stack throughout, 16 px base (20 px with "Larger text"), 800-weight
+tabular numerals on tiles and score values, `0.06em` tracking on the wordmark. Tile labels are
+baked into a 256² canvas texture at 116/92/76 px depending on digit count.
+
+**Motion.** Spawn tiles pop in from 0.2 scale; merges pulse with a half-sine to 1.18 over
+~0.25 s; the point light jumps to `8 + gain·14` and eases back; camera shake decays
+critically. All of it is skipped when `reducedMotion` is set — which also removes the title
+tile bob and the countdown entirely.
+
+**Hero of the screen.** On the title, the key-art plate with the four bobbing sample tiles over
+it. In play, the lit board — the rails are deliberately quiet, low-contrast text.
+
+### Visual assets the design calls for
+
+| Asset | Purpose |
+|---|---|
+| `assets/title-keyart.webp` | Title hero plate behind the wordmark tiles: floating glass lattice, cyan trace lines, dark upper space for the menu |
+| `assets/results-backdrop.webp` | Results screen backdrop: one large violet cube on a rippling grid, dimmed under a gradient so the table stays readable |
+| `favicon.svg`, `icon.png`, `coverart.png` | Platform identity |
+
+Both generated images are decorative (`aria-hidden`), sit behind a scrim, and are replaced by
+flat `--bg` under High Contrast.
+
+---
+
+## 9. Audio direction
+
+**Mix philosophy.** Sample-first, synthesis-always: every event tries its authored Opus clip
+and falls back to a WebAudio tone/noise recipe while the clip is loading or if it 404s, so the
+game is never silent and never blocks on the network. Nothing starts until a user gesture
+(`ensureAudio` on first pointer/first menu action); pausing suspends the context.
+
+**Buses** (`src/audio.ts`): `master` (0 when muted) → `music` (setting × 0.5), `fx` (setting),
+`ambience` (setting × 0.35). Clips are loudness-normalised to −20 LUFS so the FX bus needs no
+per-clip trims.
+
+**Music and ambience.** A synthesised sparse pulse on a six-note scale with a bass note every
+fourth step; `setMusicIntensity` is driven every frame by board occupancy (`1 − empties/cells`)
+and above 0.6 the pulse plays on every step instead of every other one — the score tightens as
+the matrix fills. Ambience is a 55 Hz/82.5 Hz drone with a 0.07 Hz LFO. Both idle while the tab
+is hidden.
+
+**Determinism.** `variant(base, seed)` derives fallback pitch from the move number and seed, so
+a replayed run sounds identical.
+
+### SFX event table (source for `sfx/manifest.txt`)
+
+| Event id | File | Sound | Usage context |
+|---|---|---|---|
+| `uiMove` | `ui-tap.opus` | Soft plastic UI tap | Forward menu navigation, from `show()` |
+| `uiBack` | `ui-back.opus` | Descending wooden blip | Any return to the title |
+| `ack` | `move-tick.opus` | Counter tick | Every accepted slide, before the slide body |
+| `slide` | `tile-slide.opus` | Wooden friction whoosh | The block travel itself |
+| `merge` | `merge-low.opus` | Wooden knock | Merge result < 64 |
+| `merge` | `merge-mid.opus` | Ceramic clack | Merge result 64–511 |
+| `merge` | `merge-high.opus` | Glass chime + impact | Merge result 512–2047 |
+| `merge` | `merge-max.opus` | Crystal boom + sparkle | Merge result ≥ 2048 |
+| `invalid` | `blocked-thud.opus` | Muted rubber bump | Direction that changes nothing; unavailable undo |
+| `milestone` | `milestone-chime.opus` | Four-note bell arpeggio | Results screen after a win |
+| `gameOver` | `game-over.opus` | Descending two-tone fade | Results screen after a loss |
+| `undo` | `undo-whoosh.opus` | Reversed airy sweep | Successful undo |
+| `achievement` | `achievement-fanfare.opus` | Bell ding + glissando | Achievements unlocked on results |
+| `countdown` | `countdown-tick.opus` | Warm sine blip | Each 3-2-1 countdown number |
+| `countdownGo` | `countdown-go.opus` | Rising two-note go | Countdown clears, input opens |
+| `hint` | `hint-ping.opus` | Glassy bell ping | Hint revealed |
+| `newBest` | `best-flourish.opus` | Two rising bells + sparkle | Results total beats the stored best (and no achievement fanfare is playing) |
+
+Captions: with "Captions for sounds" on, each event pushes a `♪ …` toast into `#caption-live`
+for ~900 ms.
+
+---
+
+## 10. Localization
+
+The product requirement is en-US, en-GB, es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR and it-IT.
+**Today the game ships US English only.** Player-facing strings live in three places:
+static markup in `index.html`, generated content strings in `src/content.ts` (lesson titles and
+bodies, theme and achievement names) and `src/ui.ts` (help cards), and runtime messages in
+`src/main.ts` (objective line, results headlines, announcements, hint phrasing). `<html lang>`
+is fixed to `en`. Numbers are rendered with plain `String()` and tabular numerals.
+
+Layout is already expansion-tolerant: every button is a flow box with wrapping text, the top
+bar wraps rather than clips, and nothing is sized to a fixed English string. See §17 for the
+intended string-table extraction.
+
+---
+
+## 11. Accessibility
+
+* **Keyboard-only path.** Every screen is reachable and completable with Tab/Enter/Space and
+  the four arrow keys; `show()` moves focus to the first control of the new screen, and the
+  pause dialog focuses `Resume`/`Close` and restores the previously focused element on close.
+  `:focus-visible` draws a 3 px accent outline offset 2 px.
+* **Screen-reader model.** The DOM board is the source of truth: `role="grid"` with a
+  `role="gridcell"` per cell labelled `"<value>, row R column C"` or `"empty, row R column C"`.
+  After every move, `#a11y-live` (polite) announces the direction, the total, and a summary
+  ("4×4 board, 9 empty cells, tiles: 1×64, 2×32, … Largest 64"). Results, hints and the
+  countdown announce as well; illegal moves use `role="alert"`.
+* **The canvas is never the only channel.** `#gl` is `aria-hidden`; when 3D is on, the DOM board
+  becomes a visually-hidden mirror, and when 3D is off (setting, or WebGL init failure, which
+  also announces "3D unavailable — using the accessible board view") the DOM board becomes the
+  visible playfield with no rules change.
+* **Reduced motion** removes the countdown, the title bob, spawn/merge animation and camera
+  shake. **High contrast** forces the mono theme, pure-black chrome and flat backdrops.
+  **Larger text** raises the base font to 20 px. **Left-handed** mirrors the play rails.
+  **Captions** transcribe sound events. **Haptics** can be switched off.
+* **Contrast and targets.** Body text `#e8ecf6` on `#0a0e1a` (≈15:1); muted `#9aa7c4` (≈7:1);
+  tile digits are white on saturated fills, or `#1b2540` on the light theme. Every button,
+  checkbox row, settings summary and journey cell is at least 44×44 px.
+
+---
+
+## 12. StarHermit integration
+
+`starhermit.txt` declares `name=Merge Matrix`, `launch=index.html`, `server=server.js`,
+`cover=coverart.png`, and the owner id. Per https://wiki.starhermit.com/ conventions the game
+uses:
+
+| Feature | How |
+|---|---|
+| Game script / server | `server.js` is the authoritative script: it hosts the static build and owns `/api/v1`. |
+| Platform time | `GET /api/v1/time` at boot; the client keeps `serverOffsetMs` so the daily day boundary is platform-authoritative. |
+| Daily content | `GET /api/v1/daily?day=` returns the immutable descriptor (seed, size 4, goal 2048, `allowUndo:false`, content and rules versions). |
+| Score submission | `POST /api/v1/daily/submit` with the full replay envelope. The server re-simulates it, and rejects `seed-mismatch`, `options-mismatch` (any redefinition of size/goal/limits, which would mint a fake milestone bonus), `replay-invalid`, `score-mismatch`, `implausible-score` (> 500 000) and `stale-version`. |
+| Leaderboards | `GET /api/v1/leaderboard?day=` — top 200 stored per day, top 10 shown in the play rail; one entry per identity per day, keeping the better run; re-submission with the same `commandId` is idempotent. |
+| Achievements | `GET /api/v1/achievements` publishes the same five definitions the client evaluates locally. |
+| Identity | Anonymous: a SHA-256 of the supplied session id or the request IP, truncated to 12 hex. No credentials, no accounts. The UI says "Guest profile · progress saves on this device". |
+
+Not used: presence, matchmaking, real-time multiplayer, cloud save, purchases, friends graph
+(the leaderboard panel is global; a friends filter would need host identity). All modes except
+Daily are fully local; when `/api` is unreachable the client shows the offline note, keeps
+playing, and reports "Daily score stored locally; server unreachable (casual board)".
+
+---
+
+## 13. Technical architecture
+
+**Module boundaries.** `rules.ts` has no DOM, no timers and no imports; `content.ts` imports
+only `rules`; `session.ts` owns persistence and is the single validated command path
+(`command`, `commandUndo`) that both UI and replay use; `main.ts` is the only module that
+touches `document` for flow control; `render.ts` consumes immutable board snapshots and never
+writes state; `audio.ts` is fire-and-forget.
+
+**Determinism and replay.** Rules version 1; content version 1. A replay envelope is
+`{schema, rulesVersion, seed, options, initialHash, commands, hashes, terminal}`. `server.js`
+carries a hand-mirrored copy of the engine (mulberry32, `slideLine`, `peekMove`, `dailySeed`,
+`stateHash`) so validation never trusts client code — any divergence between the two surfaces
+as `replay-invalid`.
+
+**Persistence** (localStorage, all writes wrapped so a blocked/full store degrades silently):
+`mm-settings-v1` (14 settings), `mm-progress-v1` (journey indices, best score per content id,
+achievement timestamps, daily days, tutorial flag, games played), `mm-snapshot-v1` (mode,
+content id, ranked flag, options, serialized state). Snapshots are written after every command,
+on pause and on leave, and cleared when a run resolves; a snapshot of an already-over run is
+discarded on load. Server state is three JSON files under `.data/` (leaderboard, submissions,
+rate limit; 240 requests/min/IP, 256 KB body cap).
+
+**Performance budgets.** One `requestAnimationFrame` loop that returns immediately while the
+tab is hidden. Quality caps device pixel ratio at 1 / 1.5 / 2 (low/medium/high) and disables
+antialiasing on low. Label textures are cached per theme+value; meshes are rebuilt only for
+cells whose value changed, and disposed geometry/materials are released explicitly. The undo
+stack is capped at 64 entries. The whole payload is HTML + CSS + seven ES modules + Three.js +
+17 Opus clips (~10–30 KB each) + two WebP images (85 KB total).
+
+**How the e2e drives the real UI.** `tests/e2e.mjs` starts its own static server on an
+ephemeral port (with a `/api/v1/time` stub and 404s for everything else, so it exercises the
+offline path), launches system Chrome through `playwright-core`, and clicks the same buttons a
+player does. It reads the board **out of `#dom-board`**, computes its next direction with a
+local mirror of `slideLine`, and presses arrow keys or performs real pointer swipes; it never
+calls into game internals to make progress.
+
+---
+
+## 14. Testing and acceptance criteria
+
+**`npm test` (vitest, `tests/rules.test.ts`, 21 cases):** `slideLine` merge-once semantics,
+merge scoring, no-change detection; two starting tiles and a legal opening; rejection of no-op
+moves, bad directions and post-terminal moves with `invalidActions` counting; undo restoring
+the exact prior hash; move-limit and time-limit termination; score composition;
+serialize/deserialize round trip and version rejection; replay build/verify including tamper
+rejection; daily seed stability and per-day distinctness; content invariants (40 stages, unique
+ids, mastery cadence, five themes with full ramps, achievements, lesson fields) and
+`validateStage` over sampled stages; `difficultyOf` monotonicity.
+
+**`npm run test:e2e` (`tests/e2e.mjs`), two passes — desktop 1280×800 and mobile 390×844 with
+touch, both must pass:** load and title visible; help opens and closes; journey grid shows 40
+stages; stage 1 starts and the countdown clears; pause → resume; settings open/close with a
+mute toggle; hint returns `Try <direction> …`; a real swipe changes the board; undo reverts it;
+then the bot plays stage 1 with arrow keys to the 128 milestone (479 moves on this seed);
+results show the milestone headline, a positive total and `seed 1000`; progress is persisted in
+localStorage; `Next stage` starts stage 2 with the right objective; leaving mid-run returns to
+the title and no delayed result screen reopens. **Any page error or non-allowlisted console
+message fails the run** (only known GPU/WebGL driver noise is filtered).
+
+**QA bar, as checkable statements** (agents/qa.md):
+
+1. A first-time player is taught: the title exposes *How to play* (7 cards) and *Learn*
+   (3 action-gated lessons) before any run, and each lesson states its completion condition. ✔
+2. Every implemented feature is reachable by clicking visible UI — all modes, all settings,
+   undo, hint, pause, resume, retry, next stage, leaderboard panel. ✔ (covered by e2e)
+3. No console errors or warnings during a full playthrough at both viewports. ✔ (e2e fails on
+   any)
+4. No text or control is cut off at 1280×800, 390×844 portrait or landscape; the board always
+   fits (camera refit plus DOM board sizing) and rails reflow. ✔
+5. Features that could use StarHermit do: time, daily descriptor, validated submission,
+   leaderboard, achievements. ✔
+6. Localization: **not met** — English only (§10, §17).
+
+`python3 tools/audit_game_assets.py merge-matrix` passes: favicon link resolves, `icon.png`
+present, every clip is 48 kHz mono Opus and appears in both the source event map and
+`manifest.json`.
+
+---
+
+## 15. Asset inventory
+
+| Path | Purpose | Source tool | Status |
+|---|---|---|---|
+| `assets/title-keyart.webp` | Title hero plate (1536×864 → WebP q80, 48 KB) | FLUX.2 klein, seed 70118 | generated in this pass, wired via `.title-art` in `style.css` |
+| `assets/results-backdrop.webp` | Results backdrop (1280×720 → WebP q80, 36 KB) | FLUX.2 klein, seed 40213 | generated in this pass, wired via `#screen-results.has-art` |
+| `coverart.png` | StarHermit cover (`cover=` in `starhermit.txt`) | pre-existing | shipped |
+| `icon.png`, `favicon.svg` | App icon and tab icon | pre-existing | shipped |
+| `sfx/ui-tap.opus` | `uiMove` | MOSS-SFX v2.0 | shipped, newly wired to menu navigation |
+| `sfx/ui-back.opus` | `uiBack` | MOSS-SFX v2.0 | shipped, newly wired to title returns |
+| `sfx/move-tick.opus` | `ack` | MOSS-SFX v2.0 | shipped |
+| `sfx/tile-slide.opus` | `slide` | MOSS-SFX v2.0 | shipped |
+| `sfx/merge-low/mid/high/max.opus` | `merge` tiers | MOSS-SFX v2.0 | shipped |
+| `sfx/blocked-thud.opus` | `invalid` | MOSS-SFX v2.0 | shipped |
+| `sfx/milestone-chime.opus` | `milestone` | MOSS-SFX v2.0 | shipped |
+| `sfx/game-over.opus` | `gameOver` | MOSS-SFX v2.0 | shipped |
+| `sfx/undo-whoosh.opus` | `undo` | MOSS-SFX v2.0 | shipped |
+| `sfx/achievement-fanfare.opus` | `achievement` | MOSS-SFX v2.0 | shipped |
+| `sfx/countdown-tick.opus` | `countdown` | MOSS-SFX v2.0, 100 steps | generated in this pass, wired |
+| `sfx/countdown-go.opus` | `countdownGo` | MOSS-SFX v2.0, 100 steps | generated in this pass, wired |
+| `sfx/hint-ping.opus` | `hint` | MOSS-SFX v2.0, 100 steps | generated in this pass, wired |
+| `sfx/best-flourish.opus` | `newBest` | MOSS-SFX v2.0, 100 steps | generated in this pass, wired |
+| `vendor/three.module.js`, `three.core.js` | WebGL renderer | three.js r183 | shipped |
+
+No 3D model or character animation is called for: the board's tiles are parametric boxes with
+generated label textures, and the game has no characters.
+
+---
+
+## 16. Known limitations
+
+* **English only.** No string table, no language picker, `<html lang="en">` (§10).
+* The hint is greedy one-ply (`gained × 100 + empties`); it can recommend a move that is
+  locally best and strategically poor.
+* Merged-cell highlighting in 3D is inferred by diffing board values rather than tracking tile
+  identities, so a spawn adjacent to a merge can occasionally miss its pulse; tiles teleport to
+  their end cells instead of sliding.
+* Score chase is labelled "ranked" in the UI but submits nothing: only Daily posts to the
+  server, so its board is local-best only.
+* The leaderboard shows a global top 10 with no friends filter, and identity falls back to a
+  hash of the request IP, so several players behind one NAT share an entry.
+* `res-board-note` reports "stored locally" on an unreachable server, but there is no retry
+  queue: an offline daily result is never submitted later.
+* The `holdToRepeat` setting exists in the settings model with no UI control and no behaviour.
+* `content.difficultyOf` double-counts mastery (`if (!s.mastery === false) d += 5` immediately
+  before `if (s.mastery) d += 10`), so it is a rough ordering rather than a calibrated curve;
+  nothing gameplay-facing consumes it.
+* Board sizes 2, 6, 7 and 8 are legal in the engine but unreachable from the UI.
+
+## 17. Design intent not yet implemented
+
+* **Localization to the nine required locales.** Intent: extract every player-facing string into
+  a keyed table per locale, mark up static markup with `data-i18n`, choose the locale from a
+  persisted setting defaulting to `navigator.languages`, set `<html lang>` accordingly, and
+  format numbers through `Intl.NumberFormat`.
+* **Ranked score chase.** Intent: submit the score-chase replay through the same validated
+  endpoint as Daily, with its own board keyed by the fixed seed.
+* **Friends leaderboard filter.** Intent: request the host identity/friends graph and filter the
+  entries panel, which is why the panel is titled generically today.
+* **Per-tile slide animation.** Intent: track tile identity across a move so blocks travel to
+  their destination instead of being rebuilt in place.
