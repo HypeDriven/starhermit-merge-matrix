@@ -9,6 +9,7 @@ import type { Settings, ActiveSession } from './session.js';
 import * as audio from './audio.js';
 import * as render from './render.js';
 import * as ui from './ui.js';
+import * as platform from './platform.js';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -24,7 +25,10 @@ let currentScreen = 'title';
 let runFinished = false;    // guards finishRun against the rAF loop / setTimeout race
 let finishScheduled = false; // a delayed reveal is pending; the loop must not pre-empt it
 
-/* ---------------- platform (/api) ---------------- */
+/* ---------------- platform (/api) ----------------
+ * Hosted mode (launch token in the URL fragment) talks to the StarHermit
+ * platform with Bearer auth; the game's own server.js stays the its-backend
+ * for replay-validated daily submission, with a graceful local fallback. */
 
 async function api(path: string, init?: RequestInit): Promise<unknown | null> {
   try {
@@ -42,12 +46,18 @@ async function api(path: string, init?: RequestInit): Promise<unknown | null> {
   }
 }
 
+/** Authenticated call in hosted mode, own-server call in local dev. */
+async function backendApi(path: string, init?: RequestInit): Promise<unknown | null> {
+  return platform.isHosted() ? platform.api(path, init) : api(path, init);
+}
+
 function setOnline(v: boolean): void {
   online = v;
   $('offline-note').hidden = v;
 }
 
 async function syncServerTime(): Promise<void> {
+  if (platform.isHosted()) return; // /time is the dev server's endpoint, not a platform route
   const t0 = Date.now();
   const r = await api('/time') as { now?: number } | null;
   if (r?.now) serverOffsetMs = r.now - (t0 + Date.now()) / 2;
@@ -58,7 +68,7 @@ function serverNow(): number { return Date.now() + serverOffsetMs; }
 async function submitDaily(sess: ActiveSession): Promise<void> {
   const env = session.replayEnvelope();
   if (!env) return;
-  const r = await api('/daily/submit', {
+  const r = await backendApi('/daily/submit', {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       day: sess.contentId.replace('daily-', ''),
@@ -74,26 +84,61 @@ async function submitDaily(sess: ActiveSession): Promise<void> {
   note.hidden = false;
   if (r?.ok) note.textContent = `Daily score accepted — rank #${r.rank ?? '—'} on today's board.`;
   else if (r?.error) note.textContent = `Daily submission rejected: ${r.error}`;
-  else note.textContent = 'Daily score stored locally; server unreachable (casual board).';
+  else note.textContent = 'Daily score stored locally; replay validation unavailable here (casual board).';
 }
 
 async function loadLeaderboard(): Promise<void> {
   const panel = $('friends-panel');
-  const r = await api(`/leaderboard?day=${session.utcToday()}`) as { entries?: { name: string; score: number }[]; casual?: boolean } | null;
-  if (!r?.entries) { panel.hidden = true; return; }
-  panel.hidden = false;
   const ol = $('leaderboard-list');
   ol.textContent = '';
-  for (const e of r.entries.slice(0, 10)) {
+  panel.hidden = false;
+  const sess = session.getActive();
+  const best = sess ? progress.bestScores[sess.contentId] ?? 0 : 0;
+  const entries = platform.isHosted() ? await platform.leaderboardEntries(10) : null;
+  if (entries) {
+    for (const e of entries) {
+      const li = document.createElement('li');
+      li.textContent = `${e.name}: ${e.score}`;
+      ol.appendChild(li);
+    }
+  } else {
+    // no platform board (local dev / offline / none configured): local records only
     const li = document.createElement('li');
-    li.textContent = `${e.name}: ${e.score}`;
+    li.textContent = `Personal best: ${best}`;
     ol.appendChild(li);
+    const note = document.createElement('li');
+    note.textContent = '(global leaderboard unavailable — local records only)';
+    ol.appendChild(note);
   }
-  if (r.casual) {
-    const li = document.createElement('li');
-    li.textContent = '(casual board — validation unavailable)';
-    ol.appendChild(li);
+}
+
+/* ---------------- profile / cloud save ---------------- */
+
+function refreshProfileLine(): void {
+  const nameEl = $('profile-name');
+  const syncEl = $('sync-status');
+  if (!platform.isHosted()) {
+    nameEl.textContent = 'Guest profile';
+    syncEl.textContent = 'progress saves on this device';
+    return;
   }
+  nameEl.textContent = platform.nicknameNow() || 'Player';
+  syncEl.textContent = 'progress synced to your account';
+}
+
+function cloudDoc(): unknown {
+  return { version: 1, progress, savedAt: Date.now() };
+}
+
+async function applyCloudSave(): Promise<void> {
+  if (!platform.isHosted()) return;
+  const doc = await platform.loadCloudSave() as { version?: number; progress?: session.Progress } | null;
+  if (doc?.version === 1 && doc.progress && doc.progress.version === 1) {
+    // remote wins on conflict; localStorage stays the offline cache
+    progress = doc.progress;
+    session.saveProgress(progress);
+  }
+  refreshProfileLine();
 }
 
 /* ---------------- screens ---------------- */
@@ -222,6 +267,7 @@ function finishRun(): void {
   const newAch = session.evaluateAchievements(progress, sess);
   session.saveProgress(progress);
   session.clearSnapshot();
+  platform.queueCloudSave(cloudDoc());
 
   // results screen
   $('results-headline').textContent = st.won
@@ -726,11 +772,23 @@ async function boot(): Promise<void> {
   document.addEventListener('keydown', onKey);
   document.addEventListener('pointerdown', () => audio.ensureAudio(), { once: true });
 
+  // hosted mode: launch token → identity, cloud save, platform leaderboard
+  const info = await platform.initPlatform();
+  platform.onSyncStatus((s) => {
+    if (!info.hosted) return;
+    $('sync-status').textContent =
+      s === 'saving' ? 'saving progress…'
+      : s === 'offline' ? 'sync offline — progress saves on this device'
+      : 'progress synced to your account';
+  });
+  await applyCloudSave();
+
   // 3D init with graceful fallback
   applyRenderMode();
   fitCanvas();
 
   await syncServerTime();
+  refreshProfileLine();
   show('title');
   refreshTitle();
   rafId = requestAnimationFrame(loop);

@@ -411,23 +411,25 @@ intended string-table extraction.
 ## 12. StarHermit integration
 
 `starhermit.txt` declares `name=Merge Matrix`, `launch=index.html`, `server=server.js`,
-`cover=coverart.png`, and the owner id. Per https://wiki.starhermit.com/ conventions the game
-uses:
+`cover=coverart.png`, and the owner id. `src/platform.ts` owns the platform contract;
+hosted mode activates iff a launch token was read. Per https://wiki.starhermit.com/
+conventions the game uses:
 
 | Feature | How |
 |---|---|
-| Game script / server | `server.js` is the authoritative script: it hosts the static build and owns `/api/v1`. |
-| Platform time | `GET /api/v1/time` at boot; the client keeps `serverOffsetMs` so the daily day boundary is platform-authoritative. |
-| Daily content | `GET /api/v1/daily?day=` returns the immutable descriptor (seed, size 4, goal 2048, `allowUndo:false`, content and rules versions). |
-| Score submission | `POST /api/v1/daily/submit` with the full replay envelope. The server re-simulates it, and rejects `seed-mismatch`, `options-mismatch` (any redefinition of size/goal/limits, which would mint a fake milestone bonus), `replay-invalid`, `score-mismatch`, `implausible-score` (> 500 000) and `stale-version`. |
-| Leaderboards | `GET /api/v1/leaderboard?day=` — top 200 stored per day, top 10 shown in the play rail; one entry per identity per day, keeping the better run; re-submission with the same `commandId` is idempotent. |
-| Achievements | `GET /api/v1/achievements` publishes the same five definitions the client evaluates locally. |
-| Identity | Anonymous: a SHA-256 of the supplied session id or the request IP, truncated to 12 hex. No credentials, no accounts. The UI says "Guest profile · progress saves on this device". |
+| Launch token | Read once from the URL fragment `#game_token=<jwt>` (query `?token=`/`?launch=` are local-dev fallbacks), then stripped. `sub` and `game_scope` are base64url-decoded; `Authorization: Bearer <token>` on every platform call; re-minted via `POST /api/v1/games/{slug}/launch-token` every 45 min (60 s retry). |
+| Game script / server | `server.js` is the its-backend: it hosts the static build for local dev and owns replay-validated `/api/v1/daily/submit`. |
+| Identity | `GET /api/v1/users/{sub}/profile` → nickname, shown on the title screen (`Player ` + id8 fallback). Never `/api/v1/me`, never usernames. |
+| Cloud save | `GET`/`PUT /api/v1/me/cloud-saves/{slug}` — one zip+base64 slot (`save.json` doc with progress + achievements); remote wins on load, ~2 s debounce + pagehide flush, sync status on the title screen. localStorage stays the offline cache. |
+| Score submission | `POST /api/v1/daily/submit` with the full replay envelope, authenticated when hosted. The dev server re-simulates it and rejects `seed-mismatch`, `options-mismatch`, `replay-invalid`, `score-mismatch`, `implausible-score` (> 500 000) and `stale-version`; on-platform or offline it degrades to "stored locally". |
+| Leaderboards | Read-only platform board: `GET /api/v1/games/{slug}` → `leaderboardId`, then `GET /api/v1/leaderboards/{leaderboardId}/entries`; entry userIds resolve to nicknames via the profile route. No board (local dev/offline) → the rail shows local records only. Personal bests are kept locally and cloud-saved. |
+| Achievements | Evaluated and stored locally in `mm-progress-v1` (five definitions in `content.ts`), mirrored through the cloud save. No server unlock calls. |
+| Platform time | `GET /api/v1/time` at boot in local dev only (the dev server's endpoint); hosted mode uses local UTC for the day boundary. |
 
-Not used: presence, matchmaking, real-time multiplayer, cloud save, purchases, friends graph
-(the leaderboard panel is global; a friends filter would need host identity). All modes except
-Daily are fully local; when `/api` is unreachable the client shows the offline note, keeps
-playing, and reports "Daily score stored locally; server unreachable (casual board)".
+Not used: presence, matchmaking, real-time multiplayer, purchases, friends graph
+(a friends leaderboard filter would need the friends API). All modes except Daily are
+fully local; when the backend is unreachable the client keeps playing and reports
+"Daily score stored locally; replay validation unavailable here (casual board)".
 
 ---
 
@@ -435,7 +437,9 @@ playing, and reports "Daily score stored locally; server unreachable (casual boa
 
 **Module boundaries.** `rules.ts` has no DOM, no timers and no imports; `content.ts` imports
 only `rules`; `session.ts` owns persistence and is the single validated command path
-(`command`, `commandUndo`) that both UI and replay use; `main.ts` is the only module that
+(`command`, `commandUndo`) that both UI and replay use; `platform.ts` owns the StarHermit
+contract (launch token, Bearer auth, profile, cloud save, read-only leaderboard) and is the
+only module that reads `location`/auth state; `main.ts` is the only module that
 touches `document` for flow control; `render.ts` consumes immutable board snapshots and never
 writes state; `audio.ts` is fire-and-forget.
 
@@ -450,8 +454,10 @@ as `replay-invalid`.
 achievement timestamps, daily days, tutorial flag, games played), `mm-snapshot-v1` (mode,
 content id, ranked flag, options, serialized state). Snapshots are written after every command,
 on pause and on leave, and cleared when a run resolves; a snapshot of an already-over run is
-discarded on load. Server state is three JSON files under `.data/` (leaderboard, submissions,
-rate limit; 240 requests/min/IP, 256 KB body cap).
+discarded on load. When hosted, `mm-progress-v1` is mirrored to the platform cloud-save slot
+(zip+base64, remote wins on load); localStorage remains the offline cache. Server state is
+three JSON files under `.data/` (leaderboard, submissions, rate limit; 240 requests/min/IP,
+256 KB body cap).
 
 **Performance budgets.** One `requestAnimationFrame` loop that returns immediately while the
 tab is hidden. Quality caps device pixel ratio at 1 / 1.5 / 2 (low/medium/high) and disables
@@ -549,8 +555,8 @@ generated label textures, and the game has no characters.
   their end cells instead of sliding.
 * Score chase is labelled "ranked" in the UI but submits nothing: only Daily posts to the
   server, so its board is local-best only.
-* The leaderboard shows a global top 10 with no friends filter, and identity falls back to a
-  hash of the request IP, so several players behind one NAT share an entry.
+* The platform leaderboard is read-only (clients cannot submit), has no friends filter, and
+  falls back to local records when no board is configured or the network is down.
 * `res-board-note` reports "stored locally" on an unreachable server, but there is no retry
   queue: an offline daily result is never submitted later.
 * The `holdToRepeat` setting exists in the settings model with no UI control and no behaviour.

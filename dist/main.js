@@ -7,6 +7,7 @@ import * as session from './session.js';
 import * as audio from './audio.js';
 import * as render from './render.js';
 import * as ui from './ui.js';
+import * as platform from './platform.js';
 const $ = (id) => document.getElementById(id);
 let settings = session.loadSettings();
 let progress = session.loadProgress();
@@ -19,7 +20,10 @@ let online = true;
 let currentScreen = 'title';
 let runFinished = false; // guards finishRun against the rAF loop / setTimeout race
 let finishScheduled = false; // a delayed reveal is pending; the loop must not pre-empt it
-/* ---------------- platform (/api) ---------------- */
+/* ---------------- platform (/api) ----------------
+ * Hosted mode (launch token in the URL fragment) talks to the StarHermit
+ * platform with Bearer auth; the game's own server.js stays the its-backend
+ * for replay-validated daily submission, with a graceful local fallback. */
 async function api(path, init) {
     try {
         const res = await fetch('/api/v1' + path, init);
@@ -37,11 +41,17 @@ async function api(path, init) {
         return null;
     }
 }
+/** Authenticated call in hosted mode, own-server call in local dev. */
+async function backendApi(path, init) {
+    return platform.isHosted() ? platform.api(path, init) : api(path, init);
+}
 function setOnline(v) {
     online = v;
     $('offline-note').hidden = v;
 }
 async function syncServerTime() {
+    if (platform.isHosted())
+        return; // /time is the dev server's endpoint, not a platform route
     const t0 = Date.now();
     const r = await api('/time');
     if (r?.now)
@@ -52,7 +62,7 @@ async function submitDaily(sess) {
     const env = session.replayEnvelope();
     if (!env)
         return;
-    const r = await api('/daily/submit', {
+    const r = await backendApi('/daily/submit', {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
             day: sess.contentId.replace('daily-', ''),
@@ -71,28 +81,58 @@ async function submitDaily(sess) {
     else if (r?.error)
         note.textContent = `Daily submission rejected: ${r.error}`;
     else
-        note.textContent = 'Daily score stored locally; server unreachable (casual board).';
+        note.textContent = 'Daily score stored locally; replay validation unavailable here (casual board).';
 }
 async function loadLeaderboard() {
     const panel = $('friends-panel');
-    const r = await api(`/leaderboard?day=${session.utcToday()}`);
-    if (!r?.entries) {
-        panel.hidden = true;
-        return;
-    }
-    panel.hidden = false;
     const ol = $('leaderboard-list');
     ol.textContent = '';
-    for (const e of r.entries.slice(0, 10)) {
-        const li = document.createElement('li');
-        li.textContent = `${e.name}: ${e.score}`;
-        ol.appendChild(li);
+    panel.hidden = false;
+    const sess = session.getActive();
+    const best = sess ? progress.bestScores[sess.contentId] ?? 0 : 0;
+    const entries = platform.isHosted() ? await platform.leaderboardEntries(10) : null;
+    if (entries) {
+        for (const e of entries) {
+            const li = document.createElement('li');
+            li.textContent = `${e.name}: ${e.score}`;
+            ol.appendChild(li);
+        }
     }
-    if (r.casual) {
+    else {
+        // no platform board (local dev / offline / none configured): local records only
         const li = document.createElement('li');
-        li.textContent = '(casual board — validation unavailable)';
+        li.textContent = `Personal best: ${best}`;
         ol.appendChild(li);
+        const note = document.createElement('li');
+        note.textContent = '(global leaderboard unavailable — local records only)';
+        ol.appendChild(note);
     }
+}
+/* ---------------- profile / cloud save ---------------- */
+function refreshProfileLine() {
+    const nameEl = $('profile-name');
+    const syncEl = $('sync-status');
+    if (!platform.isHosted()) {
+        nameEl.textContent = 'Guest profile';
+        syncEl.textContent = 'progress saves on this device';
+        return;
+    }
+    nameEl.textContent = platform.nicknameNow() || 'Player';
+    syncEl.textContent = 'progress synced to your account';
+}
+function cloudDoc() {
+    return { version: 1, progress, savedAt: Date.now() };
+}
+async function applyCloudSave() {
+    if (!platform.isHosted())
+        return;
+    const doc = await platform.loadCloudSave();
+    if (doc?.version === 1 && doc.progress && doc.progress.version === 1) {
+        // remote wins on conflict; localStorage stays the offline cache
+        progress = doc.progress;
+        session.saveProgress(progress);
+    }
+    refreshProfileLine();
 }
 /* ---------------- screens ---------------- */
 const SCREENS = ['title', 'modes', 'journey', 'learn', 'play', 'results', 'help'];
@@ -225,6 +265,7 @@ function finishRun() {
     const newAch = session.evaluateAchievements(progress, sess);
     session.saveProgress(progress);
     session.clearSnapshot();
+    platform.queueCloudSave(cloudDoc());
     // results screen
     $('results-headline').textContent = st.won
         ? `Milestone reached — ${st.goalTile}!`
@@ -775,10 +816,22 @@ async function boot() {
     bindLifecycle();
     document.addEventListener('keydown', onKey);
     document.addEventListener('pointerdown', () => audio.ensureAudio(), { once: true });
+    // hosted mode: launch token → identity, cloud save, platform leaderboard
+    const info = await platform.initPlatform();
+    platform.onSyncStatus((s) => {
+        if (!info.hosted)
+            return;
+        $('sync-status').textContent =
+            s === 'saving' ? 'saving progress…'
+                : s === 'offline' ? 'sync offline — progress saves on this device'
+                    : 'progress synced to your account';
+    });
+    await applyCloudSave();
     // 3D init with graceful fallback
     applyRenderMode();
     fitCanvas();
     await syncServerTime();
+    refreshProfileLine();
     show('title');
     refreshTitle();
     rafId = requestAnimationFrame(loop);
