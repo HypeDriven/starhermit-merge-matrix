@@ -271,7 +271,7 @@ function finishRun(): void {
 
   // results screen
   $('results-headline').textContent = st.won
-    ? `Milestone reached — ${st.goalTile}!`
+    ? (sess.mode === 'learn' ? 'Lesson complete' : `Milestone reached — ${st.goalTile}!`)
     : st.terminalReason === 'move-limit-exhausted' ? 'Out of moves'
     : st.terminalReason === 'time-expired' ? 'Time expired'
     : 'Matrix full — run over';
@@ -298,6 +298,15 @@ function finishRun(): void {
     const next = content.JOURNEY[stage.index + 1];
     nextBtn.hidden = !next;
     nextBtn.dataset.nextId = next?.id ?? '';
+    nextBtn.dataset.nextKind = 'journey';
+    nextBtn.textContent = 'Next stage';
+  } else if (sess.mode === 'learn' && st.won) {
+    const idx = content.LESSONS.findIndex((l) => l.id === sess.contentId);
+    const next = content.LESSONS[idx + 1];
+    nextBtn.hidden = !next;
+    nextBtn.dataset.nextId = next?.id ?? '';
+    nextBtn.dataset.nextKind = 'learn';
+    nextBtn.textContent = 'Next lesson';
   } else nextBtn.hidden = true;
 
   show('results');
@@ -532,6 +541,11 @@ function fitCanvas(): void {
   const rect = wrap.getBoundingClientRect();
   render.resize(Math.max(1, rect.width), Math.max(1, rect.height), devicePixelRatio || 1);
 }
+// The board box also changes without a window resize (screen shown, chat
+// sidebar, orientation): keep the drawing buffer sized to it.
+if (typeof ResizeObserver === 'function') {
+  new ResizeObserver(() => { if (currentScreen === 'play') fitCanvas(); }).observe($('board-wrap'));
+}
 
 /* ---------------- screens wiring ---------------- */
 
@@ -705,12 +719,22 @@ function bindButtons(): void {
   $('btn-pause-leave').addEventListener('click', () => { togglePause(false); leaveRun(); });
   $('btn-retry').addEventListener('click', () => {
     const sess = session.getActive();
+    if (sess && sess.mode === 'learn') {
+      // a lesson restarts as a lesson: instructions and completion rule return
+      const l = content.LESSONS.find((x) => x.id === sess.contentId);
+      if (l) { startLesson(l); return; }
+    }
     if (sess) startRun(sess.mode, sess.contentId, sess.opts, sess.ranked);
     else { show('title'); refreshTitle(); }
   });
   $('btn-results-menu').addEventListener('click', () => { show('title'); refreshTitle(); });
   $('btn-next').addEventListener('click', () => {
     const id = $('btn-next').dataset.nextId;
+    if ($('btn-next').dataset.nextKind === 'learn') {
+      const l = content.LESSONS.find((x) => x.id === id);
+      if (l) startLesson(l);
+      return;
+    }
     const s = content.JOURNEY.find((x) => x.id === id);
     if (s) startRun('journey', s.id, content.stageOptions(s), false);
   });
@@ -724,6 +748,10 @@ function bindButtons(): void {
 function restartRun(): void {
   const sess = session.getActive();
   if (!sess) return;
+  if (sess.mode === 'learn') {
+    const l = content.LESSONS.find((x) => x.id === sess.contentId);
+    if (l) { startLesson(l); return; }
+  }
   startRun(sess.mode, sess.contentId, sess.opts, sess.ranked);
 }
 
