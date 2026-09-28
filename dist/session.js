@@ -4,6 +4,7 @@
  */
 import { createGame, applyMove, undo as rulesUndo, tick as rulesTick, legalMoves, serialize, deserialize, scoreTotal, stateHash, buildReplay, dailySeed, } from './rules.js';
 import { JOURNEY, ACHIEVEMENTS } from './content.js';
+import { DEFAULT_GFX } from './gfx.js';
 const LS = {
     settings: 'mm-settings-v1',
     progress: 'mm-progress-v1',
@@ -11,7 +12,7 @@ const LS = {
 };
 export const DEFAULT_SETTINGS = {
     music: 0.5, fx: 0.8, ambience: 0.4, muted: false,
-    theme: 'matrix', quality: 'high', reducedMotion: false, highContrast: false,
+    theme: 'matrix', gfx: { ...DEFAULT_GFX }, reducedMotion: false, highContrast: false,
     largeText: false, leftHanded: false, holdToRepeat: false, haptics: true,
     captions: false, render3d: true,
 };
@@ -31,7 +32,10 @@ function writeJson(key, v) {
     catch { /* storage full/blocked */ }
 }
 export function loadSettings() {
-    return { ...DEFAULT_SETTINGS, ...(readJson(LS.settings) ?? {}) };
+    const saved = readJson(LS.settings) ?? {};
+    delete saved.quality; // pre-preset setting: superseded by gfx (Auto)
+    const gfx = { ...DEFAULT_GFX, ...(saved.gfx && typeof saved.gfx === 'object' ? saved.gfx : {}) };
+    return { ...DEFAULT_SETTINGS, ...saved, gfx };
 }
 export function saveSettings(s) {
     writeJson(LS.settings, s);

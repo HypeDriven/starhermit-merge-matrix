@@ -518,6 +518,7 @@ function togglePause(force?: boolean): void {
     $('btn-resume-play').textContent = inRun ? 'Resume' : 'Close';
     $('pause-run-actions').hidden = !inRun;
     ov.hidden = false;
+    ui.refreshGraphicsPanel(settings, glActive);
     session.persistSnapshot();
     audio.suspendAudio();
     $('btn-resume-play').focus();
@@ -767,7 +768,7 @@ function applyRenderMode(): void {
   const board = $('dom-board');
   if (settings.render3d && !glActive) {
     // reuse an existing context when possible: a disposed canvas cannot be re-acquired
-    glActive = render.isReady() || render.initRender(canvas, { quality: settings.quality, reducedMotion: settings.reducedMotion });
+    glActive = render.isReady() || render.initRender(canvas, { gfx: settings.gfx, reducedMotion: settings.reducedMotion });
     if (!glActive) announce('3D unavailable — using the accessible board view.');
   } else if (!settings.render3d && glActive) {
     glActive = false;
@@ -783,7 +784,8 @@ function onSettingsChanged(s: Settings): void {
   ui.applySettingsToDom(s);
   audio.configureAudio(s);
   applyRenderMode();
-  render.updateQuality({ quality: s.quality, reducedMotion: s.reducedMotion });
+  render.updateSettings({ gfx: s.gfx, reducedMotion: s.reducedMotion });
+  ui.refreshGraphicsPanel(s, glActive);
   const sess = session.getActive();
   if (sess) { setupBoard(sess.state); fitCanvas(); }
   updateAll();
@@ -814,6 +816,9 @@ async function boot(): Promise<void> {
   // 3D init with graceful fallback
   applyRenderMode();
   fitCanvas();
+  ui.refreshGraphicsPanel(settings, glActive);
+  // keep the Graphics summary (resolution, post-processing state) current while the sheet is open
+  setInterval(() => { if (!$('overlay-pause').hidden) ui.refreshGraphicsSummary(glActive); }, 1000);
 
   await syncServerTime();
   refreshProfileLine();

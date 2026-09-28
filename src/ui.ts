@@ -5,6 +5,9 @@
 import type { Settings } from './session.js';
 import { THEMES, type ThemeDef } from './content.js';
 import { legalMoves, type GameState, type Dir } from './rules.js';
+import { CATEGORIES, CATEGORY_KEYS, PRESETS, resolve, presetTier, choosePreset, clamp, type Preset } from './gfx.js';
+import { gfxText } from './gfxtext.js';
+import * as render from './render.js';
 
 export function themeById(id: string): ThemeDef {
   return THEMES.find((t) => t.id === id) ?? THEMES[0];
@@ -93,7 +96,6 @@ export function bindSettingsForm(s: Settings, onChange: (s: Settings) => void): 
     (get<HTMLInputElement>('set-ambience')).value = String(Math.round(s.ambience * 100));
     (get<HTMLInputElement>('set-muted')).checked = s.muted;
     (get<HTMLInputElement>('set-captions')).checked = s.captions;
-    (get<HTMLSelectElement>('set-quality')).value = s.quality;
     themeSel.value = s.theme;
     (get<HTMLInputElement>('set-render3d')).checked = s.render3d;
     (get<HTMLInputElement>('set-reduced-motion')).checked = s.reducedMotion;
@@ -109,7 +111,6 @@ export function bindSettingsForm(s: Settings, onChange: (s: Settings) => void): 
   get<HTMLInputElement>('set-ambience').addEventListener('input', (e) => { s.ambience = +(e.target as HTMLInputElement).value / 100; emit(); });
   get<HTMLInputElement>('set-muted').addEventListener('change', (e) => { s.muted = (e.target as HTMLInputElement).checked; emit(); });
   get<HTMLInputElement>('set-captions').addEventListener('change', (e) => { s.captions = (e.target as HTMLInputElement).checked; emit(); });
-  get<HTMLSelectElement>('set-quality').addEventListener('change', (e) => { s.quality = (e.target as HTMLSelectElement).value as Settings['quality']; emit(); });
   themeSel.addEventListener('change', (e) => { s.theme = (e.target as HTMLSelectElement).value; emit(); });
   get<HTMLInputElement>('set-render3d').addEventListener('change', (e) => { s.render3d = (e.target as HTMLInputElement).checked; emit(); });
   get<HTMLInputElement>('set-reduced-motion').addEventListener('change', (e) => { s.reducedMotion = (e.target as HTMLInputElement).checked; emit(); });
@@ -117,6 +118,109 @@ export function bindSettingsForm(s: Settings, onChange: (s: Settings) => void): 
   get<HTMLInputElement>('set-large-text').addEventListener('change', (e) => { s.largeText = (e.target as HTMLInputElement).checked; emit(); });
   get<HTMLInputElement>('set-left-handed').addEventListener('change', (e) => { s.leftHanded = (e.target as HTMLInputElement).checked; emit(); });
   get<HTMLInputElement>('set-haptics').addEventListener('change', (e) => { s.haptics = (e.target as HTMLInputElement).checked; emit(); });
+  bindGraphicsForm(s, emit);
+}
+
+/* ---------------- Graphics section ---------------- */
+
+const gid = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+
+function presetName(p: string): string {
+  const t = gfxText();
+  return (t as unknown as Record<string, string>)[p] ?? p;
+}
+
+/** Build the per-category selects once, then wire every Graphics control. */
+function bindGraphicsForm(s: Settings, emit: () => void): void {
+  const t = gfxText();
+  gid('gfx-quality-label').textContent = t.quality;
+  gid('gfx-scale-label').textContent = t.renderScale;
+  gid('gfx-adaptive-label').textContent = t.adaptive;
+  gid('gfx-fps-label').textContent = t.showFps;
+  const cats = gid('gfx-cats');
+  cats.textContent = '';
+  for (const cat of CATEGORY_KEYS) {
+    const label = document.createElement('label');
+    label.className = 'gfx-row';
+    const span = document.createElement('span');
+    span.textContent = t.cat[cat] ?? cat;
+    const sel = document.createElement('select');
+    sel.id = `set-gfx-${cat}`;
+    sel.dataset.gfxCat = cat;
+    for (const v of ['preset', ...CATEGORIES[cat]]) {
+      const o = document.createElement('option');
+      o.value = v;
+      o.textContent = t.tier[v] ?? v;
+      sel.appendChild(o);
+    }
+    sel.addEventListener('change', () => {
+      if (sel.value === 'preset') delete s.gfx[cat];
+      else s.gfx[cat] = sel.value;
+      emit();
+    });
+    label.append(span, sel);
+    cats.appendChild(label);
+  }
+  gid<HTMLSelectElement>('set-quality').addEventListener('change', (e) => {
+    s.gfx = choosePreset(s.gfx, (e.target as HTMLSelectElement).value); // a preset clears overrides
+    emit();
+  });
+  const scale = gid<HTMLInputElement>('set-gfx-scale');
+  scale.addEventListener('input', () => {
+    s.gfx.render_scale = clamp(+scale.value, 50, 200) / 100;
+    gid('gfx-scale-value').textContent = `${scale.value}%`;
+    emit();
+  });
+  gid<HTMLInputElement>('set-gfx-adaptive').addEventListener('change', (e) => { s.gfx.adaptive = (e.target as HTMLInputElement).checked; emit(); });
+  gid<HTMLInputElement>('set-gfx-fps').addEventListener('change', (e) => { s.gfx.show_fps = (e.target as HTMLInputElement).checked; emit(); });
+}
+
+/** Sync the Graphics controls, labels and body attributes with the current settings. */
+export function refreshGraphicsPanel(s: Settings, glActive: boolean): void {
+  const t = gfxText();
+  const { detected } = render.probeGpu();
+  const r = resolve(s.gfx, detected);
+  document.body.dataset.gfxPreset = r.preset;
+  document.body.dataset.gfxDetail = r.detail;
+  document.body.dataset.gfxAuto = String(r.auto);
+  const q = gid<HTMLSelectElement>('set-quality');
+  for (const o of Array.from(q.options)) {
+    o.textContent = o.value === 'auto' ? t.auto.replace('{tier}', presetName(detected)) : presetName(o.value);
+  }
+  q.value = (PRESETS as readonly string[]).includes(s.gfx.preset as string) ? (s.gfx.preset as string) : 'auto';
+  const pct = Math.round(clamp(Number(s.gfx.render_scale) || 1, 0.5, 2) * 100);
+  gid<HTMLInputElement>('set-gfx-scale').value = String(pct);
+  gid('gfx-scale-value').textContent = `${pct}%`;
+  for (const cat of CATEGORY_KEYS) {
+    const sel = document.getElementById(`set-gfx-${cat}`) as HTMLSelectElement | null;
+    if (!sel) continue;
+    const fromPreset = sel.options[0];
+    fromPreset.textContent = t.fromPreset.replace('{tier}', t.tier[presetTier(r.preset as Preset, cat)] ?? '');
+    const v = s.gfx[cat] as string | undefined;
+    sel.value = v && (CATEGORIES[cat] as readonly string[]).includes(v) ? v : 'preset';
+  }
+  gid<HTMLInputElement>('set-gfx-adaptive').checked = s.gfx.adaptive !== false;
+  gid<HTMLInputElement>('set-gfx-fps').checked = !!s.gfx.show_fps;
+  const off = gid('gfx-gl-off');
+  off.textContent = t.glOff;
+  off.hidden = glActive;
+  refreshGraphicsSummary(glActive);
+}
+
+/** The live line: GPU · cost summary · drawing-buffer size, plus the post-processing note. */
+export function refreshGraphicsSummary(glActive: boolean): void {
+  const t = gfxText();
+  const note = gid('gfx-post-note');
+  if (!glActive || !render.isReady()) {
+    const { gpu } = render.probeGpu();
+    gid('gfx-summary').textContent = gpu || t.unknownGpu;
+    note.hidden = true;
+    return;
+  }
+  const info = render.graphicsInfo();
+  gid('gfx-summary').textContent = `${info.gpu || t.unknownGpu} · ${info.summary(t)}`;
+  note.textContent = t.postFailed;
+  note.hidden = !info.postFailed;
 }
 
 /** Help cards generated from the current control mappings and a representative state. */

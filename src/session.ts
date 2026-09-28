@@ -8,6 +8,7 @@ import {
   type ReplayEnvelope,
 } from './rules.js';
 import { JOURNEY, ACHIEVEMENTS } from './content.js';
+import { DEFAULT_GFX, type GfxSaved } from './gfx.js';
 
 const LS = {
   settings: 'mm-settings-v1',
@@ -19,7 +20,8 @@ export interface Settings {
   music: number; fx: number; ambience: number; // 0..1
   muted: boolean;
   theme: string;
-  quality: 'low' | 'medium' | 'high';
+  /** Graphics: quality preset ('auto' default), render scale, per-effect overrides (gfx.ts). */
+  gfx: GfxSaved;
   reducedMotion: boolean;
   highContrast: boolean;
   largeText: boolean;
@@ -32,7 +34,7 @@ export interface Settings {
 
 export const DEFAULT_SETTINGS: Settings = {
   music: 0.5, fx: 0.8, ambience: 0.4, muted: false,
-  theme: 'matrix', quality: 'high', reducedMotion: false, highContrast: false,
+  theme: 'matrix', gfx: { ...DEFAULT_GFX }, reducedMotion: false, highContrast: false,
   largeText: false, leftHanded: false, holdToRepeat: false, haptics: true,
   captions: false, render3d: true,
 };
@@ -69,7 +71,10 @@ function writeJson(key: string, v: unknown): void {
 }
 
 export function loadSettings(): Settings {
-  return { ...DEFAULT_SETTINGS, ...(readJson<Partial<Settings>>(LS.settings) ?? {}) };
+  const saved = readJson<Partial<Settings> & { quality?: string }>(LS.settings) ?? {};
+  delete saved.quality; // pre-preset setting: superseded by gfx (Auto)
+  const gfx = { ...DEFAULT_GFX, ...(saved.gfx && typeof saved.gfx === 'object' ? saved.gfx : {}) };
+  return { ...DEFAULT_SETTINGS, ...saved, gfx };
 }
 
 export function saveSettings(s: Settings): void {

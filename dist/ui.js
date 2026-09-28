@@ -1,5 +1,8 @@
 import { THEMES } from './content.js';
 import { legalMoves } from './rules.js';
+import { CATEGORIES, CATEGORY_KEYS, PRESETS, resolve, presetTier, choosePreset, clamp } from './gfx.js';
+import { gfxText } from './gfxtext.js';
+import * as render from './render.js';
 export function themeById(id) {
     return THEMES.find((t) => t.id === id) ?? THEMES[0];
 }
@@ -85,7 +88,6 @@ export function bindSettingsForm(s, onChange) {
         (get('set-ambience')).value = String(Math.round(s.ambience * 100));
         (get('set-muted')).checked = s.muted;
         (get('set-captions')).checked = s.captions;
-        (get('set-quality')).value = s.quality;
         themeSel.value = s.theme;
         (get('set-render3d')).checked = s.render3d;
         (get('set-reduced-motion')).checked = s.reducedMotion;
@@ -101,7 +103,6 @@ export function bindSettingsForm(s, onChange) {
     get('set-ambience').addEventListener('input', (e) => { s.ambience = +e.target.value / 100; emit(); });
     get('set-muted').addEventListener('change', (e) => { s.muted = e.target.checked; emit(); });
     get('set-captions').addEventListener('change', (e) => { s.captions = e.target.checked; emit(); });
-    get('set-quality').addEventListener('change', (e) => { s.quality = e.target.value; emit(); });
     themeSel.addEventListener('change', (e) => { s.theme = e.target.value; emit(); });
     get('set-render3d').addEventListener('change', (e) => { s.render3d = e.target.checked; emit(); });
     get('set-reduced-motion').addEventListener('change', (e) => { s.reducedMotion = e.target.checked; emit(); });
@@ -109,6 +110,106 @@ export function bindSettingsForm(s, onChange) {
     get('set-large-text').addEventListener('change', (e) => { s.largeText = e.target.checked; emit(); });
     get('set-left-handed').addEventListener('change', (e) => { s.leftHanded = e.target.checked; emit(); });
     get('set-haptics').addEventListener('change', (e) => { s.haptics = e.target.checked; emit(); });
+    bindGraphicsForm(s, emit);
+}
+/* ---------------- Graphics section ---------------- */
+const gid = (id) => document.getElementById(id);
+function presetName(p) {
+    const t = gfxText();
+    return t[p] ?? p;
+}
+/** Build the per-category selects once, then wire every Graphics control. */
+function bindGraphicsForm(s, emit) {
+    const t = gfxText();
+    gid('gfx-quality-label').textContent = t.quality;
+    gid('gfx-scale-label').textContent = t.renderScale;
+    gid('gfx-adaptive-label').textContent = t.adaptive;
+    gid('gfx-fps-label').textContent = t.showFps;
+    const cats = gid('gfx-cats');
+    cats.textContent = '';
+    for (const cat of CATEGORY_KEYS) {
+        const label = document.createElement('label');
+        label.className = 'gfx-row';
+        const span = document.createElement('span');
+        span.textContent = t.cat[cat] ?? cat;
+        const sel = document.createElement('select');
+        sel.id = `set-gfx-${cat}`;
+        sel.dataset.gfxCat = cat;
+        for (const v of ['preset', ...CATEGORIES[cat]]) {
+            const o = document.createElement('option');
+            o.value = v;
+            o.textContent = t.tier[v] ?? v;
+            sel.appendChild(o);
+        }
+        sel.addEventListener('change', () => {
+            if (sel.value === 'preset')
+                delete s.gfx[cat];
+            else
+                s.gfx[cat] = sel.value;
+            emit();
+        });
+        label.append(span, sel);
+        cats.appendChild(label);
+    }
+    gid('set-quality').addEventListener('change', (e) => {
+        s.gfx = choosePreset(s.gfx, e.target.value); // a preset clears overrides
+        emit();
+    });
+    const scale = gid('set-gfx-scale');
+    scale.addEventListener('input', () => {
+        s.gfx.render_scale = clamp(+scale.value, 50, 200) / 100;
+        gid('gfx-scale-value').textContent = `${scale.value}%`;
+        emit();
+    });
+    gid('set-gfx-adaptive').addEventListener('change', (e) => { s.gfx.adaptive = e.target.checked; emit(); });
+    gid('set-gfx-fps').addEventListener('change', (e) => { s.gfx.show_fps = e.target.checked; emit(); });
+}
+/** Sync the Graphics controls, labels and body attributes with the current settings. */
+export function refreshGraphicsPanel(s, glActive) {
+    const t = gfxText();
+    const { detected } = render.probeGpu();
+    const r = resolve(s.gfx, detected);
+    document.body.dataset.gfxPreset = r.preset;
+    document.body.dataset.gfxDetail = r.detail;
+    document.body.dataset.gfxAuto = String(r.auto);
+    const q = gid('set-quality');
+    for (const o of Array.from(q.options)) {
+        o.textContent = o.value === 'auto' ? t.auto.replace('{tier}', presetName(detected)) : presetName(o.value);
+    }
+    q.value = PRESETS.includes(s.gfx.preset) ? s.gfx.preset : 'auto';
+    const pct = Math.round(clamp(Number(s.gfx.render_scale) || 1, 0.5, 2) * 100);
+    gid('set-gfx-scale').value = String(pct);
+    gid('gfx-scale-value').textContent = `${pct}%`;
+    for (const cat of CATEGORY_KEYS) {
+        const sel = document.getElementById(`set-gfx-${cat}`);
+        if (!sel)
+            continue;
+        const fromPreset = sel.options[0];
+        fromPreset.textContent = t.fromPreset.replace('{tier}', t.tier[presetTier(r.preset, cat)] ?? '');
+        const v = s.gfx[cat];
+        sel.value = v && CATEGORIES[cat].includes(v) ? v : 'preset';
+    }
+    gid('set-gfx-adaptive').checked = s.gfx.adaptive !== false;
+    gid('set-gfx-fps').checked = !!s.gfx.show_fps;
+    const off = gid('gfx-gl-off');
+    off.textContent = t.glOff;
+    off.hidden = glActive;
+    refreshGraphicsSummary(glActive);
+}
+/** The live line: GPU · cost summary · drawing-buffer size, plus the post-processing note. */
+export function refreshGraphicsSummary(glActive) {
+    const t = gfxText();
+    const note = gid('gfx-post-note');
+    if (!glActive || !render.isReady()) {
+        const { gpu } = render.probeGpu();
+        gid('gfx-summary').textContent = gpu || t.unknownGpu;
+        note.hidden = true;
+        return;
+    }
+    const info = render.graphicsInfo();
+    gid('gfx-summary').textContent = `${info.gpu || t.unknownGpu} · ${info.summary(t)}`;
+    note.textContent = t.postFailed;
+    note.hidden = !info.postFailed;
 }
 /** Help cards generated from the current control mappings and a representative state. */
 export function buildHelpCards(el) {

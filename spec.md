@@ -31,13 +31,17 @@ grid can hold — with a seeded board that anyone can replay move for move.
 | `src/session.ts` | Active session, settings/progress/snapshot persistence, achievement evaluation, clock |
 | `src/main.ts` | Boot, screen state machine, input routing (keys/pointer/gamepad), results, `/api` client |
 | `src/ui.ts` | DOM board build/render, ARIA labels, settings form binding, help cards, hint text |
-| `src/render.ts` | Three.js scene: tile meshes, label textures, camera framing, merge pulse, glow/shake |
+| `src/render.ts` | Three.js scene: tile meshes, label textures, camera framing, merge pulse, glow/shake, lights/shadows/IBL, particles, post chain, adaptive resolution, `setGraphics()`/`graphicsInfo()` |
+| `src/gfx.ts` | Pure graphics quality model: presets, per-effect categories, GPU → Auto preset, `resolve()`, `presetTier()`, `choosePreset()`, `describe()`, adaptive step |
+| `src/gfxtext.ts` | Graphics-section strings in the nine required locales; locale from `navigator.language` |
 | `src/audio.ts` | Three buses, authored `sfx/*.opus` one-shots with synthesis fallback, adaptive music |
 | `server.js` | StarHermit game script: static host + `/api/v1` time, daily, replay-validated submit, leaderboard |
 | `tests/rules.test.ts` | 21 vitest cases over rules + content |
+| `tests/gfx.test.ts` | 16 vitest cases over the graphics model and its locale strings |
 | `tests/e2e.mjs` | Playwright-core playthrough of the real UI at desktop and mobile |
 | `sfx/` | 17 Opus clips, `manifest.txt` (canonical), `manifest.json` (generator), `manifest.md` |
 | `assets/` | FLUX key art used by the title and results screens |
+| `vendor/three/addons/` | three.js r183 addons (post-processing passes and shaders, `RoundedBoxGeometry`, `RoomEnvironment`), mapped by the import map as `three/addons/` |
 | `coverart.png`, `icon.png`, `favicon.svg` | Platform art |
 
 ---
@@ -305,6 +309,45 @@ baked into a 256² canvas texture at 116/92/76 px depending on digit count.
 critically. All of it is skipped when `reducedMotion` is set — which also removes the title
 tile bob and the countdown entirely.
 
+**Graphics.** The board is lit by a hemisphere fill (sky blue over the theme's background), a
+key directional light and an accent-tinted rim light, tone-mapped with ACES Filmic into sRGB;
+a point light in the theme accent drifts slowly across the glass and flares on merges.
+Optional effects: key-light PCF shadows (a shadow box fitted to the board for the current
+size), image-based reflections (a PMREM-filtered `RoomEnvironment` as `scene.environment`),
+GTAO ambient occlusion for contact darkening between tiles and cells, bloom with an HDR
+threshold of 2.0 so only the light-trace frame, the emissive sides of 128+ tiles (not on the
+light or high-contrast themes, and less on pale fills) and hot glints glow, a colour grade
+(gentle S-curve, saturation, cool shadows / warm highlights) with vignette, and FXAA/SMAA/MSAA
+anti-aliasing. **Tile detail** swaps the plain boxes for rounded clearcoat tiles
+(`MeshPhysicalMaterial`) on rounded cell pads with a grain roughness map, a bevelled label with a
+keyline behind white digits, a glowing light-trace frame around the slab, a faint circuit grid
+on the ground that fades into distance fog, and glassy bevelled title tiles on the menu.
+**Particles** are accent-coloured motes rising slowly in a ring around (never over) the board.
+Ambient motion (motes, light drift) stops under reduced motion. The settings sheet's
+**Graphics** section offers, after Theme and the 3D toggle: a quality preset (Auto — chosen from
+the GPU's unmasked renderer string, where software renderers get Low, discrete GPUs and Apple M
+get High, others Balanced, and touch devices are capped at Balanced — Low, Balanced, High,
+Ultra), a render scale (50–200 % of the preset's), a select per effect — shadows
+off/low/medium/high, ambient occlusion off/on/high, bloom, colour grade, anti-aliasing
+off/FXAA/SMAA/MSAA, reflections, tile detail plain/detailed, particles off/low/high — each
+defaulting to "From preset (…)", adaptive resolution (on by default: over 90-frame windows the
+resolution steps down 10 % to a floor of 60 % when frames average over 26 ms, back up 5 % under
+14 ms) and a frame-rate readout (bottom-left, never over controls), plus a summary line
+"GPU · cost · W×H px". Choosing a preset clears the overrides. Changes apply immediately,
+without a reload, and are saved in `mm-settings-v1.gfx`; `body` (and the canvas) carry
+`data-gfx-preset`. If the post chain cannot be built the board renders without it and the
+section says so; with the 3D board off, it says the options apply when it is on.
+
+| Preset | Pixel-ratio cap × scale | Shadows | AO | Bloom | Grade | AA | Reflections | Detail | Particles |
+|---|---|---|---|---|---|---|---|---|---|
+| Low | 1 × 1 | off | off | off | off | MSAA (canvas) | off | plain | off |
+| Balanced | 1.5 × 1 | 1024² | off | on | on | FXAA | on | detailed | low (70) |
+| High | 2 × 1 | 2048² | on | on | on | SMAA | on | detailed | high (220) |
+| Ultra | 2 × 1.25 | 4096² | high | on | on | MSAA (4× target) | on | detailed | high (220) |
+
+Low renders straight to the canvas with no composer, so it costs no more than the pre-preset
+board did.
+
 **Hero of the screen.** On the title, the key-art plate with the four bobbing sample tiles over
 it. In play, the lit board — the rails are deliberately quiet, low-contrast text.
 
@@ -371,7 +414,10 @@ for ~900 ms.
 ## 10. Localization
 
 The product requirement is en-US, en-GB, es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR and it-IT.
-**Today the game ships US English only.** Player-facing strings live in three places:
+**Today the game ships US English only**, except the Graphics settings section: its labels,
+options, notes and cost summary come from `src/gfxtext.ts` in all nine locales, picked from
+`navigator.language` (unknown languages fall back to en-US; `es-*` outside Spain → es-419,
+`pt-*` → pt-BR). Other player-facing strings live in three places:
 static markup in `index.html`, generated content strings in `src/content.ts` (lesson titles and
 bodies, theme and achievement names) and `src/ui.ts` (help cards), and runtime messages in
 `src/main.ts` (objective line, results headlines, announcements, hint phrasing). `<html lang>`
@@ -398,8 +444,8 @@ intended string-table extraction.
   becomes a visually-hidden mirror, and when 3D is off (setting, or WebGL init failure, which
   also announces "3D unavailable — using the accessible board view") the DOM board becomes the
   visible playfield with no rules change.
-* **Reduced motion** removes the countdown, the title bob, spawn/merge animation and camera
-  shake. **High contrast** forces the mono theme, pure-black chrome and flat backdrops.
+* **Reduced motion** removes the countdown, the title bob, spawn/merge animation, camera
+  shake, and the drifting motes and accent light. **High contrast** forces the mono theme, pure-black chrome and flat backdrops.
   **Larger text** raises the base font to 20 px. **Left-handed** mirrors the play rails.
   **Captions** transcribe sound events. **Haptics** can be switched off.
 * **Contrast and targets.** Body text `#e8ecf6` on `#0a0e1a` (≈15:1); muted `#9aa7c4` (≈7:1);
@@ -450,7 +496,7 @@ carries a hand-mirrored copy of the engine (mulberry32, `slideLine`, `peekMove`,
 as `replay-invalid`.
 
 **Persistence** (localStorage, all writes wrapped so a blocked/full store degrades silently):
-`mm-settings-v1` (14 settings), `mm-progress-v1` (journey indices, best score per content id,
+`mm-settings-v1` (14 settings, one of them the nested `gfx` graphics object), `mm-progress-v1` (journey indices, best score per content id,
 achievement timestamps, daily days, tutorial flag, games played), `mm-snapshot-v1` (mode,
 content id, ranked flag, options, serialized state). Snapshots are written after every command,
 on pause and on leave, and cleared when a run resolves; a snapshot of an already-over run is
@@ -460,10 +506,13 @@ three JSON files under `.data/` (leaderboard, submissions, rate limit; 240 reque
 256 KB body cap).
 
 **Performance budgets.** One `requestAnimationFrame` loop that returns immediately while the
-tab is hidden. Quality caps device pixel ratio at 1 / 1.5 / 2 (low/medium/high) and disables
-antialiasing on low. Label textures are cached per theme+value; meshes are rebuilt only for
+tab is hidden. The pixel ratio is `min(dpr, preset cap) × preset scale × render scale ×
+adaptive scale` (caps 1 / 1.5 / 2 / 2); the post chain is rebuilt only when its key (effects,
+size, ratio) changes and is skipped entirely when no effect needs it. Label textures and tile
+materials are cached per theme+detail+value, tile geometry is shared, and cell pads are one
+instanced mesh; meshes are rebuilt only for
 cells whose value changed, and disposed geometry/materials are released explicitly. The undo
-stack is capped at 64 entries. The whole payload is HTML + CSS + seven ES modules + Three.js +
+stack is capped at 64 entries. The whole payload is HTML + CSS + ten ES modules + Three.js with 20 addon files +
 17 Opus clips (~10–30 KB each) + two WebP images (85 KB total).
 
 **How the e2e drives the real UI.** `tests/e2e.mjs` starts its own static server on an
@@ -477,7 +526,11 @@ calls into game internals to make progress.
 
 ## 14. Testing and acceptance criteria
 
-**`npm test` (vitest, `tests/rules.test.ts`, 21 cases):** `slideLine` merge-once semantics,
+**`npm test` (vitest, 37 cases).** `tests/gfx.test.ts` (16): `detectPreset` on SwiftShader,
+llvmpipe, NVIDIA, AMD, Apple M, Intel, Adreno and empty strings plus the touch cap; `resolve()`
+for Auto, explicit presets, overrides, invalid values and render-scale clamping; every preset
+defining every category; `choosePreset` clearing overrides; `describe()` text; the adaptive
+step; and every locale carrying every Graphics string. `tests/rules.test.ts` (21): `slideLine` merge-once semantics,
 merge scoring, no-change detection; two starting tiles and a legal opening; rejection of no-op
 moves, bad directions and post-terminal moves with `invalidActions` counting; undo restoring
 the exact prior hash; move-limit and time-limit termination; score composition;
@@ -487,14 +540,17 @@ ids, mastery cadence, five themes with full ramps, achievements, lesson fields) 
 `validateStage` over sampled stages; `difficultyOf` monotonicity.
 
 **`npm run test:e2e` (`tests/e2e.mjs`), two passes — desktop 1280×800 and mobile 390×844 with
-touch, both must pass:** load and title visible; help opens and closes; journey grid shows 40
+touch, both must pass:** load and title visible; Settings → Graphics shows "Auto (detected:
+Low)" on the software GPU, Low then High apply live (`data-gfx-preset` on body and canvas, SMAA
+and bloom in the summary), a bloom override leaves the summary and persists, a reload keeps
+preset and override, and choosing Auto clears the override; help opens and closes; journey grid shows 40
 stages; stage 1 starts and the countdown clears; pause → resume; settings open/close with a
 mute toggle; hint returns `Try <direction> …`; a real swipe changes the board; undo reverts it;
 then the bot plays stage 1 with arrow keys to the 128 milestone (479 moves on this seed);
 results show the milestone headline, a positive total and `seed 1000`; progress is persisted in
 localStorage; `Next stage` starts stage 2 with the right objective; leaving mid-run returns to
 the title and no delayed result screen reopens. **Any page error or non-allowlisted console
-message fails the run** (only known GPU/WebGL driver noise is filtered).
+message or warning fails the run** (only known GPU/WebGL driver noise is filtered).
 
 **QA bar, as checkable statements** (agents/qa.md):
 
@@ -508,7 +564,7 @@ message fails the run** (only known GPU/WebGL driver noise is filtered).
    fits (camera refit plus DOM board sizing) and rails reflow. ✔
 5. Features that could use StarHermit do: time, daily descriptor, validated submission,
    leaderboard, achievements. ✔
-6. Localization: **not met** — English only (§10, §17).
+6. Localization: **not met** — English only apart from the Graphics section (§10, §17).
 
 `python3 tools/audit_game_assets.py merge-matrix` passes: favicon link resolves, `icon.png`
 present, every clip is 48 kHz mono Opus and appears in both the source event map and
@@ -539,6 +595,7 @@ present, every clip is 48 kHz mono Opus and appears in both the source event map
 | `sfx/hint-ping.opus` | `hint` | MOSS-SFX v2.0, 100 steps | generated in this pass, wired |
 | `sfx/best-flourish.opus` | `newBest` | MOSS-SFX v2.0, 100 steps | generated in this pass, wired |
 | `vendor/three.module.js`, `three.core.js` | WebGL renderer | three.js r183 | shipped |
+| `vendor/three/addons/` | EffectComposer, RenderPass, ShaderPass, OutputPass, GTAOPass, UnrealBloomPass, SMAAPass, FXAAPass (+ shaders, SimplexNoise), RoundedBoxGeometry, RoomEnvironment | three.js r183 (`three@0.183.0` examples/jsm) | shipped |
 
 No 3D model or character animation is called for: the board's tiles are parametric boxes with
 generated label textures, and the game has no characters.
@@ -547,7 +604,9 @@ generated label textures, and the game has no characters.
 
 ## 16. Known limitations
 
-* **English only.** No string table, no language picker, `<html lang="en">` (§10).
+* **English only** outside the Graphics section. No string table, no language picker, `<html lang="en">` (§10).
+* The canvas is created with antialiasing on, so anti-aliasing "Off" only removes FXAA/SMAA or
+  the MSAA post target; the context's own MSAA stays until the page reloads.
 * The hint is greedy one-ply (`gained × 100 + empties`); it can recommend a move that is
   locally best and strategically poor.
 * Merged-cell highlighting in 3D is inferred by diffing board values rather than tracking tile
@@ -567,7 +626,7 @@ generated label textures, and the game has no characters.
 
 ## 17. Design intent not yet implemented
 
-* **Localization to the nine required locales.** Intent: extract every player-facing string into
+* **Localization to the nine required locales** (the Graphics section alone is already localized). Intent: extract every player-facing string into
   a keyed table per locale, mark up static markup with `data-i18n`, choose the locale from a
   persisted setting defaulting to `navigator.languages`, set `<html lang>` accordingly, and
   format numbers through `Intl.NumberFormat`.

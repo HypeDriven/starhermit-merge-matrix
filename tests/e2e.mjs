@@ -2,7 +2,7 @@
  * Merge Matrix — end-to-end playthrough test (dev only, not shipped).
  *
  * Drives the real visible UI in headless Chrome (playwright-core + system Chrome):
- *   title → help → journey → stage 1 → countdown → play (arrow keys + swipe) →
+ *   title → graphics settings (Low/High/override/reload) → help → journey → stage 1 → countdown → play (arrow keys + swipe) →
  *   win at the 128 milestone → results → next stage → pause/resume → settings
  *   → hint/undo → leave → title.
  *
@@ -154,7 +154,7 @@ async function runPass(browser, vpName, viewport, hasTouch) {
   const errors = [];
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
   page.on('console', (m) => {
-    if (m.type() === 'error' && !browserNoise.test(m.text())) errors.push(`console: ${m.text()}`);
+    if ((m.type() === 'error' || m.type() === 'warning') && !browserNoise.test(m.text())) errors.push(`console ${m.type()}: ${m.text()}`);
   });
 
   const step = async (name, fn) => {
@@ -168,6 +168,51 @@ async function runPass(browser, vpName, viewport, hasTouch) {
       await page.waitForSelector('#screen-title:not([hidden])', { timeout: 10000 });
       await page.waitForSelector('#btn-play:visible');
       await page.screenshot({ path: SHOT('title', vpName) });
+    });
+
+    await step('graphics settings: presets, override, live apply, persistence', async () => {
+      const openGraphics = async () => {
+        await page.click('#btn-settings-top');
+        await page.waitForSelector('#overlay-pause:not([hidden])');
+        await page.click('#settings-graphics summary');
+        await page.waitForSelector('#set-quality', { state: 'visible' });
+      };
+      const presetIs = async (want) => {
+        await page.waitForFunction((w) => document.body.dataset.gfxPreset === w
+          && (document.getElementById('gl').hidden || document.getElementById('gl').dataset.gfxPreset === w), want);
+      };
+      await openGraphics();
+      // headless Chrome is a software GPU: Auto resolves to Low
+      await presetIs('low');
+      const autoLabel = await page.locator('#set-quality option[value="auto"]').textContent();
+      if (!/Auto \(detected: Low\)/.test(autoLabel)) throw new Error(`unexpected Auto label: ${autoLabel}`);
+      await page.selectOption('#set-quality', 'low');
+      await presetIs('low');
+      await page.selectOption('#set-quality', 'high');
+      await presetIs('high');
+      let summary = await page.textContent('#gfx-summary');
+      if (!/SMAA/.test(summary) || !/bloom/.test(summary)) throw new Error(`High summary: ${summary}`);
+      const fromPreset = await page.locator('#set-gfx-shadows option[value="preset"]').textContent();
+      if (fromPreset !== 'From preset (Medium)') throw new Error(`shadows preset label: ${fromPreset}`);
+      await page.selectOption('#set-gfx-bloom', 'off');
+      summary = await page.textContent('#gfx-summary');
+      if (/bloom/.test(summary)) throw new Error(`bloom override not applied: ${summary}`);
+      const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('mm-settings-v1')).gfx);
+      if (saved.preset !== 'high' || saved.bloom !== 'off') throw new Error(`gfx not persisted: ${JSON.stringify(saved)}`);
+      await page.screenshot({ path: SHOT('graphics', vpName) });
+      // survives a reload
+      await page.reload({ waitUntil: 'load' });
+      await page.waitForSelector('#screen-title:not([hidden])');
+      await openGraphics();
+      await presetIs('high');
+      if (await page.inputValue('#set-quality') !== 'high') throw new Error('preset lost on reload');
+      if (await page.inputValue('#set-gfx-bloom') !== 'off') throw new Error('override lost on reload');
+      // choosing a preset clears overrides; back to Auto keeps the rest of the run cheap
+      await page.selectOption('#set-quality', 'auto');
+      await presetIs('low');
+      if (await page.inputValue('#set-gfx-bloom') !== 'preset') throw new Error('preset did not clear overrides');
+      await page.click('#btn-resume-play');
+      await page.waitForSelector('#overlay-pause', { state: 'hidden' });
     });
 
     await step('help screen opens and closes', async () => {

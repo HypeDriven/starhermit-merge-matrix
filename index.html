@@ -7,7 +7,7 @@
 <title>Merge Matrix</title>
 <meta name="description" content="Merge Matrix — slide the grid, merge equal blocks, reach the milestone.">
 <link rel="stylesheet" href="style.css">
-<script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/three/addons/" } }</script>
 </head>
 <body>
 <div id="app">
@@ -193,17 +193,30 @@
           <label class="check"><input type="checkbox" id="set-muted"> Mute all</label>
           <label class="check"><input type="checkbox" id="set-captions"> Captions for sounds</label>
         </details>
-        <details class="settings-block">
+        <details class="settings-block" id="settings-graphics">
           <summary>Graphics</summary>
-          <label>Quality
-            <select id="set-quality">
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high" selected>High</option>
-            </select>
-          </label>
           <label>Theme <select id="set-theme"></select></label>
           <label class="check"><input type="checkbox" id="set-render3d" checked> 3D board (WebGL)</label>
+          <p id="gfx-gl-off" class="note" hidden></p>
+          <div id="gfx-controls" class="gfx-controls">
+            <label class="gfx-row"><span id="gfx-quality-label">Quality</span>
+              <select id="set-quality" data-gfx="preset">
+                <option value="auto">Auto</option>
+                <option value="low">Low</option>
+                <option value="balanced">Balanced</option>
+                <option value="high">High</option>
+                <option value="ultra">Ultra</option>
+              </select>
+            </label>
+            <label class="gfx-row gfx-range"><span id="gfx-scale-label">Render scale</span>
+              <span class="range-line"><input type="range" id="set-gfx-scale" data-gfx="render_scale" min="50" max="200" step="5" value="100"><output id="gfx-scale-value" for="set-gfx-scale">100%</output></span>
+            </label>
+            <div id="gfx-cats"></div>
+            <label class="check"><input type="checkbox" id="set-gfx-adaptive" data-gfx="adaptive" checked> <span id="gfx-adaptive-label">Adaptive resolution</span></label>
+            <label class="check"><input type="checkbox" id="set-gfx-fps" data-gfx="show_fps"> <span id="gfx-fps-label">Show frame rate</span></label>
+            <p id="gfx-summary" class="note"></p>
+            <p id="gfx-post-note" class="note warn-text" hidden></p>
+          </div>
         </details>
         <details class="settings-block">
           <summary>Accessibility &amp; controls</summary>
