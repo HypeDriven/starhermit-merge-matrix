@@ -636,3 +636,7 @@ generated label textures, and the game has no characters.
   entries panel, which is why the panel is titled generically today.
 * **Per-tile slide animation.** Intent: track tile identity across a move so blocks travel to
   their destination instead of being rebuilt in place.
+
+## Browser interference
+
+`browser-guard.js` (loaded from `index.html`) suppresses browser UI that gets in the way of play: the right-click context menu, the iOS long-press callout, copy / cut / paste, and page text selection. Text fields (inputs, textareas, selects, contenteditable) keep normal selection, context menu and clipboard behaviour.
