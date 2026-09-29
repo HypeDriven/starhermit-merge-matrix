@@ -1,4 +1,5 @@
 name=Merge Matrix
+description=Slide numbered blocks across a grid and merge equal values to build ever-larger tiles.
 launch=index.html
 owner=2712e04e-461b-4d23-81ae-e40b429128a8
 server=server.js
