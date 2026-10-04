@@ -29,15 +29,20 @@ grid can hold — with a seeded board that anyone can replay move for move.
 | `src/rules.ts` | Pure rules engine: board, slide/merge, scoring, RNG, undo, replay envelope, daily seed |
 | `src/content.ts` | Versioned content: 5 themes, 3 lessons, 40 journey stages, 5 achievements, offline stage validator |
 | `src/session.ts` | Active session, settings/progress/snapshot persistence, achievement evaluation, clock |
-| `src/main.ts` | Boot, screen state machine, input routing (keys/pointer/gamepad), results, `/api` client |
+| `src/main.ts` | Boot, screen state machine, input routing (keys/pointer/gamepad), results (no own-server calls) |
 | `src/ui.ts` | DOM board build/render, ARIA labels, settings form binding, help cards, hint text |
 | `src/render.ts` | Three.js scene: tile meshes, label textures, camera framing, merge pulse, glow/shake, lights/shadows/IBL, particles, post chain, adaptive resolution, `setGraphics()`/`graphicsInfo()` |
 | `src/gfx.ts` | Pure graphics quality model: presets, per-effect categories, GPU → Auto preset, `resolve()`, `presetTier()`, `choosePreset()`, `describe()`, adaptive step |
 | `src/gfxtext.ts` | Graphics-section strings in the nine required locales; locale from `navigator.language` |
 | `src/audio.ts` | Three buses, authored `sfx/*.opus` one-shots with synthesis fallback, adaptive music |
-| `server.js` | StarHermit game script: static host + `/api/v1` time, daily, replay-validated submit, leaderboard |
+| `src/platform.ts` | StarHermit adapter over the SDK: identity, sign-in/invite, cloud save, settings KV, key bindings, read-only leaderboard |
+| `src/starhermit-sdk.d.ts` | Type declarations for the shared SDK (`window.StarHermit`) |
+| `src/sh-strings.ts` | Account strings (sign-in, invite, toasts) in the nine locales |
+| `starhermit-sdk.js` | Shared StarHermit client (unmodified copy, loaded as a classic script) |
+| `server.js` | Local static host; its legacy `/api/v1` routes (time, daily submit, leaderboard) are not called by the client |
 | `tests/rules.test.ts` | 21 vitest cases over rules + content |
 | `tests/gfx.test.ts` | 16 vitest cases over the graphics model and its locale strings |
+| `tests/platform.test.ts` | 4 vitest cases: the StarHermit adapter over the real SDK with a stubbed fetch (token, nickname, `game:<slug>` cloud save, settings KV, bindings, invite, zero fetches standalone, sign-in) |
 | `tests/e2e.mjs` | Playwright-core playthrough of the real UI at desktop and mobile |
 | `sfx/` | 17 Opus clips, `manifest.txt` (canonical), `manifest.json` (generator), `manifest.md` |
 | `assets/` | FLUX key art used by the title and results screens |
@@ -206,8 +211,9 @@ themes by `i % 5`. Stage completion is stored by index in `progress.journeyCompl
 journey grid marks completed cells and exposes name/goal/size/limit/theme in `aria-label`.
 
 **Daily.** `dailySeed('YYYY-MM-DD')` is an FNV-1a hash of `merge-matrix-daily:<day>`, identical
-in client and server, so every player gets the same board. The client syncs to `/api/v1/time`
-at boot so the day rolls over on platform time.
+in client and server, so every player gets the same board. When signed in the client reads
+`GET /api/v1/time` (via the SDK) at boot so the day rolls over on platform time; standalone it
+uses the local clock and makes no request.
 
 **Achievements** (`content.ACHIEVEMENTS`, granted in `session.evaluateAchievements`, idempotent
 per key with an unlock timestamp): First Light (first win), Matrix Adept (mastery stage),
@@ -457,25 +463,33 @@ intended string-table extraction.
 ## 12. StarHermit integration
 
 `starhermit.txt` declares `name=Merge Matrix`, `launch=index.html`, `server=server.js`,
-`cover=coverart.png`, and the owner id. `src/platform.ts` owns the platform contract;
-hosted mode activates iff a launch token was read. Per https://wiki.starhermit.com/
-conventions the game uses:
+`cover=coverart.png`, the owner id, and one `control.<action>=<Code>[+<Code>] | <Label>` line
+per keyboard action (up, down, left, right, undo, hint, pause). All platform calls go through
+the shared client `starhermit-sdk.js` (copied unchanged to the repo root, loaded by
+`index.html` before `dist/main.js`, typed by `src/starhermit-sdk.d.ts`) via `src/platform.ts`;
+hosted mode means signed in. Per https://wiki.starhermit.com/ conventions the game uses:
 
 | Feature | How |
 |---|---|
-| Launch token | Read once from the URL fragment `#game_token=<jwt>` (query `?token=`/`?launch=` are local-dev fallbacks), then stripped. `sub` and `game_scope` are base64url-decoded; `Authorization: Bearer <token>` on every platform call; re-minted via `POST /api/v1/games/{slug}/launch-token` every 45 min (60 s retry). |
-| Game script / server | `server.js` is the its-backend: it hosts the static build for local dev and owns replay-validated `/api/v1/daily/submit`. |
-| Identity | `GET /api/v1/users/{sub}/profile` → nickname, shown on the title screen (`Player ` + id8 fallback). Never `/api/v1/me`, never usernames. |
-| Cloud save | `GET`/`PUT /api/v1/me/cloud-saves/{slug}` — one zip+base64 slot (`save.json` doc with progress + achievements); remote wins on load, ~2 s debounce + pagehide flush, sync status on the title screen. localStorage stays the offline cache. |
-| Score submission | `POST /api/v1/daily/submit` with the full replay envelope, authenticated when hosted. The dev server re-simulates it and rejects `seed-mismatch`, `options-mismatch`, `replay-invalid`, `score-mismatch`, `implausible-score` (> 500 000) and `stale-version`; on-platform or offline it degrades to "stored locally". |
-| Leaderboards | Read-only platform board: `GET /api/v1/games/{slug}` → `leaderboardId`, then `GET /api/v1/leaderboards/{leaderboardId}/entries`; entry userIds resolve to nicknames via the profile route. No board (local dev/offline) → the rail shows local records only. Personal bests are kept locally and cloud-saved. |
-| Achievements | Evaluated and stored locally in `mm-progress-v1` (five definitions in `content.ts`), mirrored through the cloud save. No server unlock calls. |
-| Platform time | `GET /api/v1/time` at boot in local dev only (the dev server's endpoint); hosted mode uses local UTC for the day boundary. |
+| Launch token + renewal | `StarHermit.init()` reads `#game_token=` (library launch) or `#access_token=` (sign-in return) once, strips it and renews it before expiry. If renewal is refused the game toasts "signed out", hides the invite button and keeps playing locally. |
+| Sign-in | On `<id>.starhermit.com` without a token the title shows **Sign in with StarHermit**; hidden when signed in and when running locally. |
+| Identity | Profile `nickname` (fallback `Player <id prefix>`; never `/api/v1/me`, never usernames), shown on the title screen with the sync status. |
+| Cloud save | The `game:<slug>` cloud-save slot holds `{version, progress, savedAt}`; remote wins on load, ~2 s debounce + keepalive flush on pagehide/hidden tab. localStorage stays the offline cache. |
+| Settings KV | Every preference (volumes, mute, theme, graphics, motion, contrast, text size, left-handed, hold-to-repeat, haptics, captions, 3D view) is patched to the per-player settings store on change (changed keys only); at boot the stored values override the local ones. |
+| Controls | Keyboard input is routed by `event.code` through `StarHermit.loadBindings()` (defaults = the manifest lines); the Help "Controls" card and the Undo/Hint key chips show the effective keys. |
+| Invite link | Signed-in players get **Invite a friend** on the title, copying `StarHermit.inviteLink()` with a confirmation toast. |
+| Leaderboards | Read-only: the game's first platform board when one exists (`StarHermit.leaderboard()`, names via profiles). No board (local dev/offline) → the rail shows local records only. Personal bests are kept locally and cloud-saved. |
+| Achievements | Evaluated and stored locally in `mm-progress-v1` (five definitions in `content.ts`), mirrored through the cloud save. |
+| Standalone | No launch token → zero own-server requests: local clock, the daily result is kept as a local personal best. `server.js` only hosts the static build for local dev (its legacy replay-validated `POST /api/v1/daily/submit` is no longer called). |
 
-Not used: presence, matchmaking, real-time multiplayer, purchases, friends graph
-(a friends leaderboard filter would need the friends API). All modes except Daily are
-fully local; when the backend is unreachable the client keeps playing and reports
-"Daily score stored locally; replay validation unavailable here (casual board)".
+Account strings are localized in the nine locales (`src/sh-strings.ts`).
+
+Not used: platform sessions, matchmaking, friend-picker invites, chat, replays, presence,
+real-time multiplayer and purchases — Merge Matrix is single-player and `server.js` is a
+standalone Node host, not a platform game script, so it reports no scores, achievements or
+replays. All modes except Daily are fully local; when the dev backend is unreachable the
+client keeps playing and reports "Daily score stored locally; replay validation unavailable
+here (casual board)".
 
 ---
 
@@ -484,8 +498,8 @@ fully local; when the backend is unreachable the client keeps playing and report
 **Module boundaries.** `rules.ts` has no DOM, no timers and no imports; `content.ts` imports
 only `rules`; `session.ts` owns persistence and is the single validated command path
 (`command`, `commandUndo`) that both UI and replay use; `platform.ts` owns the StarHermit
-contract (launch token, Bearer auth, profile, cloud save, read-only leaderboard) and is the
-only module that reads `location`/auth state; `main.ts` is the only module that
+contract (over the shared SDK: identity, cloud save, settings KV, bindings, sign-in/invite,
+read-only leaderboard) and is the only module that reads auth state; `main.ts` is the only module that
 touches `document` for flow control; `render.ts` consumes immutable board snapshots and never
 writes state; `audio.ts` is fire-and-forget.
 
@@ -516,8 +530,7 @@ stack is capped at 64 entries. The whole payload is HTML + CSS + ten ES modules 
 17 Opus clips (~10–30 KB each) + two WebP images (85 KB total).
 
 **How the e2e drives the real UI.** `tests/e2e.mjs` starts its own static server on an
-ephemeral port (with a `/api/v1/time` stub and 404s for everything else, so it exercises the
-offline path), launches system Chrome through `playwright-core`, and clicks the same buttons a
+ephemeral port (no `/api` routes; any same-origin `/api` or `/ws` request fails the pass), launches system Chrome through `playwright-core`, and clicks the same buttons a
 player does. It reads the board **out of `#dom-board`**, computes its next direction with a
 local mirror of `slideLine`, and presses arrow keys or performs real pointer swipes; it never
 calls into game internals to make progress.
@@ -526,7 +539,7 @@ calls into game internals to make progress.
 
 ## 14. Testing and acceptance criteria
 
-**`npm test` (vitest, 37 cases).** `tests/gfx.test.ts` (16): `detectPreset` on SwiftShader,
+**`npm test` (vitest, 41 cases, including the 4 StarHermit adapter cases).** `tests/gfx.test.ts` (16): `detectPreset` on SwiftShader,
 llvmpipe, NVIDIA, AMD, Apple M, Intel, Adreno and empty strings plus the touch cap; `resolve()`
 for Auto, explicit presets, overrides, invalid values and render-scale clamping; every preset
 defining every category; `choosePreset` clearing overrides; `describe()` text; the adaptive

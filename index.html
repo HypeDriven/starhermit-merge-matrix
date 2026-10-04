@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="style.css">
 <script type="importmap">{ "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/three/addons/" } }</script>
 <script src="browser-guard.js"></script>
+<script src="starhermit-sdk.js"></script>
 </head>
 <body>
 <div id="app">
@@ -41,6 +42,8 @@
         <button id="btn-journey" class="btn">Journey <span id="journey-progress" class="note"></span></button>
         <button id="btn-learn" class="btn">Learn</button>
         <button id="btn-help" class="btn">How to play</button>
+        <button id="btn-signin" class="btn" hidden>Sign in with StarHermit</button>
+        <button id="btn-invite" class="btn" hidden>Invite a friend</button>
       </nav>
       <p id="profile-line" class="note"><span id="profile-name">Guest profile</span> · <span id="sync-status">progress saves on this device</span></p>
     </section>
@@ -135,8 +138,8 @@
         </div>
         <aside class="rail rail-right">
           <div class="row col">
-            <button id="btn-undo" class="btn small">Undo <span class="kbd">Z</span></button>
-            <button id="btn-hint" class="btn small">Hint <span class="kbd">H</span></button>
+            <button id="btn-undo" class="btn small">Undo <span class="kbd" data-key="undo">Z</span></button>
+            <button id="btn-hint" class="btn small">Hint <span class="kbd" data-key="hint">H</span></button>
             <button id="btn-restart" class="btn small">Restart</button>
             <button id="btn-leave" class="btn small danger">Leave</button>
           </div>
@@ -238,9 +241,9 @@
     <!-- settings shortcut reuses the pause sheet -->
     <div id="caption-live" class="caption-live" aria-live="polite"></div>
     <div id="a11y-live" class="visually-hidden" aria-live="polite"></div>
-    <div id="offline-note" class="note" hidden>Offline — hosted features unavailable, local play continues.</div>
   </main>
 </div>
+<p id="sh-toast" class="sh-toast" role="status" aria-live="polite" hidden></p>
 <script type="module" src="dist/main.js"></script>
 </body>
 </html>

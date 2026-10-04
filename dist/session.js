@@ -1,8 +1,8 @@
 /**
  * Merge Matrix — session, persistence, settings, progression, replay.
- * Local-first: practice runs fully offline; hosted daily validation goes through /api.
+ * Local-first: every mode runs fully offline; no own-server calls.
  */
-import { createGame, applyMove, undo as rulesUndo, tick as rulesTick, legalMoves, serialize, deserialize, scoreTotal, stateHash, buildReplay, dailySeed, } from './rules.js';
+import { createGame, applyMove, undo as rulesUndo, tick as rulesTick, legalMoves, serialize, deserialize, scoreTotal, stateHash, dailySeed, } from './rules.js';
 import { JOURNEY, ACHIEVEMENTS } from './content.js';
 import { DEFAULT_GFX } from './gfx.js';
 const LS = {
@@ -158,12 +158,6 @@ export function advanceClock() {
 }
 export function legal() {
     return active ? legalMoves(active.state) : [];
-}
-export function replayEnvelope() {
-    if (!active)
-        return null;
-    const cmds = active.state.log.map((m) => m.dir);
-    return buildReplay(active.opts, cmds);
 }
 export function currentHash() {
     return active ? stateHash(active.state) : '';

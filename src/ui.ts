@@ -80,7 +80,18 @@ export function boardSummary(st: GameState): string {
   return `${st.size}×${st.size} board, ${empty} empty cells, tiles: ${parts.join(', ')}. Largest ${st.maxTile}.`;
 }
 
+let boundSettings: Settings | null = null;
+let formSync: (() => void) | null = null;
+
+/** Merge externally loaded values (StarHermit settings KV) into the bound form state and redraw it. */
+export function patchSettingsForm(patch: Partial<Settings>): void {
+  if (!boundSettings) return;
+  Object.assign(boundSettings, patch);
+  formSync?.();
+}
+
 export function bindSettingsForm(s: Settings, onChange: (s: Settings) => void): void {
+  boundSettings = s;
   const get = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
   const themeSel = get<HTMLSelectElement>('set-theme');
   themeSel.textContent = '';
@@ -105,6 +116,7 @@ export function bindSettingsForm(s: Settings, onChange: (s: Settings) => void): 
     (get<HTMLInputElement>('set-haptics')).checked = s.haptics;
   };
   sync();
+  formSync = sync;
   const emit = () => onChange({ ...s });
   get<HTMLInputElement>('set-music').addEventListener('input', (e) => { s.music = +(e.target as HTMLInputElement).value / 100; emit(); });
   get<HTMLInputElement>('set-fx').addEventListener('input', (e) => { s.fx = +(e.target as HTMLInputElement).value / 100; emit(); });
@@ -224,7 +236,7 @@ export function refreshGraphicsSummary(glActive: boolean): void {
 }
 
 /** Help cards generated from the current control mappings and a representative state. */
-export function buildHelpCards(el: HTMLElement): void {
+export function buildHelpCards(el: HTMLElement, keys: (a: 'up' | 'down' | 'left' | 'right' | 'undo' | 'hint' | 'pause') => string): void {
   el.textContent = '';
   const cards: [string, string][] = [
     ['Slide', 'Arrow keys, WASD, swipe, or the on-board drag. Every block slides until it hits the edge or another block.'],
@@ -232,7 +244,7 @@ export function buildHelpCards(el: HTMLElement): void {
     ['New blocks', 'After every valid move, a new 2 (90%) or 4 (10%) appears in a random empty cell, chosen by the run\'s seed.'],
     ['Scoring', 'You score the value of every merge. Reaching the goal tile adds a milestone bonus; constrained modes add an efficiency bonus.'],
     ['Losing', 'The run ends when no move changes the board — a full grid with no adjacent equals.'],
-    ['Controls', 'Arrows/WASD: slide · Z: undo (where allowed) · H: hint · P/Esc: pause · swipe or drag on the board · every action also has a button.'],
+    ['Controls', `${keys('up')} ${keys('left')} ${keys('down')} ${keys('right')}: slide · ${keys('undo')}: undo (where allowed) · ${keys('hint')}: hint · ${keys('pause')}: pause · swipe or drag on the board · every action also has a button.`],
     ['Seeds & fairness', 'Practice and Journey seeds are fixed. The daily seed is shared per UTC day, so everyone plays the same board.'],
   ];
   for (const [h, body] of cards) {

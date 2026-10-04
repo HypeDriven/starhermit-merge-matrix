@@ -8,6 +8,7 @@ import * as audio from './audio.js';
 import * as render from './render.js';
 import * as ui from './ui.js';
 import * as platform from './platform.js';
+import { shStrings } from './sh-strings.js';
 const $ = (id) => document.getElementById(id);
 let settings = session.loadSettings();
 let progress = session.loadProgress();
@@ -16,72 +17,25 @@ let rafId = 0;
 let paused = false;
 let lastFocused = null;
 let serverOffsetMs = 0; // serverTime - clientTime
-let online = true;
 let currentScreen = 'title';
 let runFinished = false; // guards finishRun against the rAF loop / setTimeout race
 let finishScheduled = false; // a delayed reveal is pending; the loop must not pre-empt it
-/* ---------------- platform (/api) ----------------
+/* ---------------- platform ----------------
  * Hosted mode (launch token in the URL fragment) talks to the StarHermit
- * platform with Bearer auth; the game's own server.js stays the its-backend
- * for replay-validated daily submission, with a graceful local fallback. */
-async function api(path, init) {
-    try {
-        const res = await fetch('/api/v1' + path, init);
-        const body = await res.json().catch(() => null);
-        if (!res.ok) {
-            if (res.status === 429)
-                announce('Server is busy; try again shortly.');
-            return null;
-        }
-        setOnline(true);
-        return body;
-    }
-    catch {
-        setOnline(false);
-        return null;
-    }
-}
-/** Authenticated call in hosted mode, own-server call in local dev. */
-async function backendApi(path, init) {
-    return platform.isHosted() ? platform.api(path, init) : api(path, init);
-}
-function setOnline(v) {
-    online = v;
-    $('offline-note').hidden = v;
-}
+ * platform through the SDK. Standalone play makes no network requests:
+ * local clock, local records. */
 async function syncServerTime() {
-    if (platform.isHosted())
-        return; // /time is the dev server's endpoint, not a platform route
-    const t0 = Date.now();
-    const r = await api('/time');
-    if (r?.now)
-        serverOffsetMs = r.now - (t0 + Date.now()) / 2;
+    serverOffsetMs = await platform.serverTimeOffset();
 }
 function serverNow() { return Date.now() + serverOffsetMs; }
-async function submitDaily(sess) {
-    const env = session.replayEnvelope();
-    if (!env)
-        return;
-    const r = await backendApi('/daily/submit', {
-        method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-            day: sess.contentId.replace('daily-', ''),
-            replay: env,
-            score: rules.scoreTotal(sess.state),
-            moves: sess.state.moves,
-            invalidActions: sess.state.invalidActions,
-            elapsedMs: sess.state.elapsedMs,
-            contentVersion: sess.contentVersion,
-        }),
-    });
+function noteDailyResult() {
+    // Platform boards are read-only and there is no own server: the daily score
+    // is kept as a personal best (cloud-synced when signed in).
     const note = $('res-board-note');
     note.hidden = false;
-    if (r?.ok)
-        note.textContent = `Daily score accepted — rank #${r.rank ?? '—'} on today's board.`;
-    else if (r?.error)
-        note.textContent = `Daily submission rejected: ${r.error}`;
-    else
-        note.textContent = 'Daily score stored locally; replay validation unavailable here (casual board).';
+    note.textContent = platform.isHosted()
+        ? 'Daily score kept as your personal best and synced to your account (platform boards are read-only).'
+        : 'Daily score stored locally as your personal best.';
 }
 async function loadLeaderboard() {
     const panel = $('friends-panel');
@@ -107,6 +61,33 @@ async function loadLeaderboard() {
         note.textContent = '(global leaderboard unavailable — local records only)';
         ol.appendChild(note);
     }
+}
+/* ---------------- account (sign-in / invite) ---------------- */
+const shT = shStrings(typeof navigator !== 'undefined' ? (navigator.languages ?? [navigator.language]) : []);
+let toastTimer = null;
+function toast(text) {
+    const el = $('sh-toast');
+    el.textContent = text;
+    el.hidden = false;
+    if (toastTimer !== null)
+        clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.hidden = true; }, 3200);
+}
+/** Sign-in on the platform host without a token; invite when signed in; both hidden locally. */
+function refreshAccountButtons() {
+    $('btn-signin').hidden = !platform.canSignIn();
+    $('btn-invite').hidden = !platform.isHosted();
+}
+function bindAccount() {
+    $('btn-signin').textContent = shT.signIn;
+    $('btn-invite').textContent = shT.invite;
+    $('btn-signin').addEventListener('click', () => platform.signIn());
+    $('btn-invite').addEventListener('click', () => {
+        const link = platform.inviteLink();
+        if (!link)
+            return;
+        navigator.clipboard.writeText(link).then(() => toast(shT.copied), () => toast(shT.copyFailed));
+    });
 }
 /* ---------------- profile / cloud save ---------------- */
 function refreshProfileLine() {
@@ -317,7 +298,7 @@ function finishRun() {
     else
         audio.sfx.gameOver();
     if (sess.mode === 'daily')
-        void submitDaily(sess);
+        noteDailyResult();
 }
 /* ---------------- input ---------------- */
 let lastCommandId = 0;
@@ -450,35 +431,56 @@ function runCountdown(done) {
         audio.sfx.countdown(n);
     }, 450);
 }
-/* keyboard */
-const KEYMAP = {
-    ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
-    w: 'up', s: 'down', a: 'left', d: 'right',
-    W: 'up', S: 'down', A: 'left', D: 'right',
+const DEFAULT_BINDINGS = {
+    up: ['ArrowUp', 'KeyW'], down: ['ArrowDown', 'KeyS'], left: ['ArrowLeft', 'KeyA'], right: ['ArrowRight', 'KeyD'],
+    undo: ['KeyZ'], hint: ['KeyH'], pause: ['Escape', 'KeyP'],
 };
+let bindings = DEFAULT_BINDINGS;
+let codeToAction = new Map();
+function keyLabel(code) {
+    const named = { ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Escape: 'Esc' };
+    if (named[code])
+        return named[code];
+    if (/^Key[A-Z]$/.test(code))
+        return code.slice(3);
+    if (/^Digit\d$/.test(code))
+        return code.slice(5);
+    return code;
+}
+function keysFor(a) { return bindings[a].map(keyLabel).join('/'); }
+function setBindings(b) {
+    bindings = b;
+    codeToAction = new Map();
+    for (const a of Object.keys(b))
+        for (const c of b[a])
+            codeToAction.set(c, a);
+    document.querySelectorAll('.kbd[data-key]').forEach((k) => {
+        k.textContent = keysFor(k.dataset.key);
+    });
+}
 function onKey(e) {
     const tag = e.target?.tagName;
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA')
         return;
+    const act = codeToAction.get(e.code);
     if (currentScreen === 'play' && !paused) {
-        const dir = KEYMAP[e.key];
-        if (dir) {
+        if (act === 'up' || act === 'down' || act === 'left' || act === 'right') {
             e.preventDefault();
-            doMove(dir);
+            doMove(act);
             return;
         }
-        if (e.key === 'z' || e.key === 'Z') {
+        if (act === 'undo') {
             e.preventDefault();
             doUndo();
             return;
         }
-        if (e.key === 'h' || e.key === 'H') {
+        if (act === 'hint') {
             e.preventDefault();
             doHint();
             return;
         }
     }
-    if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') {
+    if (act === 'pause') {
         if (currentScreen === 'play') {
             e.preventDefault();
             togglePause();
@@ -728,7 +730,7 @@ function bindButtons() {
     });
     $('btn-journey').addEventListener('click', () => { buildJourneyGrid(); show('journey'); });
     $('btn-learn').addEventListener('click', () => { buildLessonList(); show('learn'); });
-    $('btn-help').addEventListener('click', () => { ui.buildHelpCards($('help-cards')); show('help'); });
+    $('btn-help').addEventListener('click', () => { ui.buildHelpCards($('help-cards'), keysFor); show('help'); });
     $('btn-help-back').addEventListener('click', () => { show('title'); refreshTitle(); });
     $('btn-modes-back').addEventListener('click', () => { show('title'); refreshTitle(); });
     $('btn-journey-back').addEventListener('click', () => { show('title'); refreshTitle(); });
@@ -833,6 +835,7 @@ function applyRenderMode() {
 function onSettingsChanged(s) {
     settings = s;
     session.saveSettings(s);
+    platform.pushSettings(s); // per-player StarHermit settings KV (changed keys only)
     ui.applySettingsToDom(s);
     audio.configureAudio(s);
     applyRenderMode();
@@ -855,17 +858,45 @@ async function boot() {
     bindLifecycle();
     document.addEventListener('keydown', onKey);
     document.addEventListener('pointerdown', () => audio.ensureAudio(), { once: true });
-    // hosted mode: launch token → identity, cloud save, platform leaderboard
+    setBindings(DEFAULT_BINDINGS);
+    // hosted mode: launch token → identity, cloud save, settings KV, bindings, leaderboard
     const info = await platform.initPlatform();
     platform.onSyncStatus((s) => {
-        if (!info.hosted)
+        if (!platform.isHosted())
             return;
         $('sync-status').textContent =
             s === 'saving' ? 'saving progress…'
                 : s === 'offline' ? 'sync offline — progress saves on this device'
                     : 'progress synced to your account';
     });
+    bindAccount();
+    platform.onAuth((e) => {
+        refreshProfileLine();
+        refreshAccountButtons();
+        if (!e.signedIn)
+            toast(shT.signedOut); // keep playing locally
+    });
     await applyCloudSave();
+    if (info.hosted) {
+        const [kv, b] = await Promise.all([platform.loadSettings(), platform.loadBindings(DEFAULT_BINDINGS)]);
+        setBindings(b);
+        // settings KV wins over the local copy, key by key
+        const patch = {};
+        for (const k of Object.keys(session.DEFAULT_SETTINGS)) {
+            if (kv[k] !== undefined && kv[k] !== null)
+                patch[k] = kv[k];
+        }
+        if (Object.keys(patch).length) {
+            // applied before the 3D init below, which reads `settings`
+            settings = { ...settings, ...patch };
+            session.saveSettings(settings);
+            ui.patchSettingsForm(patch);
+            ui.applySettingsToDom(settings);
+            audio.configureAudio(settings);
+        }
+        platform.primeSettings(settings);
+    }
+    refreshAccountButtons();
     // 3D init with graceful fallback
     applyRenderMode();
     fitCanvas();

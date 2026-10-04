@@ -6,9 +6,9 @@
  *   win at the 128 milestone → results → next stage → pause/resume → settings
  *   → hint/undo → leave → title.
  *
- * The game is fully playable offline (practice/journey/learn are local-first);
- * the StarHermit /api endpoints (daily submission, leaderboard) are absent here
- * and the game degrades gracefully — no backend required for this playthrough.
+ * The game is fully playable offline and, with no launch token, must make zero
+ * same-origin /api or /ws requests — each pass asserts that (the static server
+ * below has no such routes).
  * server.js is the StarHermit authoritative game script, so this test embeds its
  * own minimal static file server on an ephemeral port.
  *
@@ -38,17 +38,6 @@ function serve() {
   const server = http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url, 'http://x');
-      if (url.pathname === '/api/v1/time') {
-        // minimal platform-time stub (matches server.js) so offline boot stays clean
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ now: Date.now() }));
-        return;
-      }
-      if (url.pathname.startsWith('/api/')) {
-        res.writeHead(404, { 'content-type': 'application/json' });
-        res.end('{"error":"offline"}');
-        return;
-      }
       let p = path.normalize(decodeURIComponent(url.pathname)).replace(/^([/\\])+/, '');
       if (!p) p = 'index.html';
       const file = path.join(ROOT, p);
@@ -153,6 +142,11 @@ async function runPass(browser, vpName, viewport, hasTouch) {
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
+  page.on('request', (r) => {
+    const u = new URL(r.url());
+    if (/^(127\.0\.0\.1|localhost)$/.test(u.hostname) && /^\/(api|ws)(\/|$)/.test(u.pathname)) errors.push(`own-server request: ${r.method()} ${u.pathname}`);
+  });
+  page.on('websocket', (ws) => errors.push(`websocket opened: ${ws.url()}`));
   page.on('console', (m) => {
     if ((m.type() === 'error' || m.type() === 'warning') && !browserNoise.test(m.text())) errors.push(`console ${m.type()}: ${m.text()}`);
   });
@@ -359,7 +353,7 @@ async function runPass(browser, vpName, viewport, hasTouch) {
         st.board[0][0] = st.goalTile / 2;
         st.board[0][1] = st.goalTile / 2;
         st.moveLimit = st.moves + 1; // the final move both reaches the goal and exhausts the limit
-        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', code: 'ArrowLeft', bubbles: true }));
         if (!getActive().state.over) throw new Error('winning fixture did not finish');
         document.getElementById('btn-leave').click();
       });

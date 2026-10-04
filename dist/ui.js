@@ -72,7 +72,17 @@ export function boardSummary(st) {
         .map(([v, n]) => `${n}×${v}`);
     return `${st.size}×${st.size} board, ${empty} empty cells, tiles: ${parts.join(', ')}. Largest ${st.maxTile}.`;
 }
+let boundSettings = null;
+let formSync = null;
+/** Merge externally loaded values (StarHermit settings KV) into the bound form state and redraw it. */
+export function patchSettingsForm(patch) {
+    if (!boundSettings)
+        return;
+    Object.assign(boundSettings, patch);
+    formSync?.();
+}
 export function bindSettingsForm(s, onChange) {
+    boundSettings = s;
     const get = (id) => document.getElementById(id);
     const themeSel = get('set-theme');
     themeSel.textContent = '';
@@ -97,6 +107,7 @@ export function bindSettingsForm(s, onChange) {
         (get('set-haptics')).checked = s.haptics;
     };
     sync();
+    formSync = sync;
     const emit = () => onChange({ ...s });
     get('set-music').addEventListener('input', (e) => { s.music = +e.target.value / 100; emit(); });
     get('set-fx').addEventListener('input', (e) => { s.fx = +e.target.value / 100; emit(); });
@@ -212,7 +223,7 @@ export function refreshGraphicsSummary(glActive) {
     note.hidden = !info.postFailed;
 }
 /** Help cards generated from the current control mappings and a representative state. */
-export function buildHelpCards(el) {
+export function buildHelpCards(el, keys) {
     el.textContent = '';
     const cards = [
         ['Slide', 'Arrow keys, WASD, swipe, or the on-board drag. Every block slides until it hits the edge or another block.'],
@@ -220,7 +231,7 @@ export function buildHelpCards(el) {
         ['New blocks', 'After every valid move, a new 2 (90%) or 4 (10%) appears in a random empty cell, chosen by the run\'s seed.'],
         ['Scoring', 'You score the value of every merge. Reaching the goal tile adds a milestone bonus; constrained modes add an efficiency bonus.'],
         ['Losing', 'The run ends when no move changes the board — a full grid with no adjacent equals.'],
-        ['Controls', 'Arrows/WASD: slide · Z: undo (where allowed) · H: hint · P/Esc: pause · swipe or drag on the board · every action also has a button.'],
+        ['Controls', `${keys('up')} ${keys('left')} ${keys('down')} ${keys('right')}: slide · ${keys('undo')}: undo (where allowed) · ${keys('hint')}: hint · ${keys('pause')}: pause · swipe or drag on the board · every action also has a button.`],
         ['Seeds & fairness', 'Practice and Journey seeds are fixed. The daily seed is shared per UTC day, so everyone plays the same board.'],
     ];
     for (const [h, body] of cards) {
