@@ -94,7 +94,9 @@ function bindAccount(): void {
   $('btn-invite').addEventListener('click', () => {
     const link = platform.inviteLink();
     if (!link) return;
-    navigator.clipboard.writeText(link).then(() => toast(shT.copied), () => toast(shT.copyFailed));
+    // navigator.clipboard is undefined outside secure contexts: report it instead of throwing
+    const clip = navigator.clipboard?.writeText ? navigator.clipboard.writeText(link) : Promise.reject(new Error('clipboard unavailable'));
+    clip.then(() => toast(shT.copied), () => toast(shT.copyFailed));
   });
 }
 
