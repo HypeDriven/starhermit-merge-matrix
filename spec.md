@@ -274,11 +274,17 @@ setting swaps the two rails via grid areas.
 the action rail keeps `padding-bottom: calc(0.3rem + var(--safe-bottom))`.
 
 **Mobile landscape.** Rails return to narrow vertical columns capped at 140 px so the board
-keeps the vertical space.
+keeps the vertical space; each rail is one non-wrapping column that scrolls, so the hint box
+stacks under the action buttons.
+
+**Large screens.** `ui-scale.js` sets `--ui-scale` (exactly 1 up to a 1600×1000 viewport, then
+`min(w/1600, h/1000)`, capped at 2.5); `#app` and the StarHermit toast zoom by it, so the top bar,
+rails, menus and sheets keep their desktop proportions on 2K–4K monitors, and menu/text screens
+centre vertically. The 3D canvas sizes its drawing buffer from its on-screen rect, so it stays crisp.
 
 **Never cut off:** the top bar's score/best/moves/timer (it wraps rather than clipping), the
 whole board (the 3D camera retreats and tilts toward overhead as aspect narrows;
-`buildDomBoard` sizes the DOM grid with `min(92vw, 92dvh − 220px, size·96px)`), the primary
+`buildDomBoard` sizes the DOM grid with `min(92vw, 92dvh − 220px, size·96px)`, vw/dvh divided by `--ui-scale`), the primary
 action of any screen, and the pause sheet (`max-height: calc(100dvh − 2rem)` with its own
 scroll). All screens pad by `env(safe-area-inset-*)`.
 

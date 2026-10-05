@@ -29,7 +29,7 @@ export function tileColorOf(t, v) {
 export function buildDomBoard(el, size) {
     el.textContent = '';
     el.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
-    el.style.width = `min(92vw, 92dvh - 220px, ${size * 96}px)`;
+    el.style.width = `min(calc(92vw / var(--ui-scale, 1)), calc(92dvh / var(--ui-scale, 1) - 220px), ${size * 96}px)`;
     el.style.maxWidth = '100%';
     for (let r = 0; r < size; r++) {
         for (let c = 0; c < size; c++) {

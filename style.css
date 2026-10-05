@@ -28,7 +28,15 @@ body.high-contrast { --bg: #000; --panel: #111; --panel2: #222; --text: #fff; --
 button { font: inherit; cursor: pointer; }
 :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
-#app { display: flex; flex-direction: column; height: 100dvh; }
+#app { display: flex; flex-direction: column; height: calc(100dvh / var(--ui-scale, 1)); }
+/* Large screens: the whole DOM app (and the body-level toast) zooms by --ui-scale
+   (ui-scale.js, exactly 1 up to 1600x1000); vh/vw lengths inside are divided by it.
+   The 3D canvas sizes its buffer from its visual rect, so it stays crisp. */
+#app, body > .sh-toast { zoom: var(--ui-scale, 1); }
+/* scaled: menu/text screens sit centred vertically instead of at the top */
+html.ui-scaled #main { display: flex; flex-direction: column; }
+html.ui-scaled #main > .screen { width: 100%; margin-block: auto; flex-shrink: 0; }
+html.ui-scaled #main > .screen.play { flex-shrink: 1; margin-block: 0; }
 #topbar {
   display: flex; align-items: center; gap: 1rem;
   padding: calc(0.5rem + var(--safe-top)) calc(1rem + var(--safe-right)) 0.5rem calc(1rem + var(--safe-left));
@@ -155,7 +163,7 @@ body.left-handed .rail-right { grid-area: left; }
 }
 .sheet {
   background: var(--panel); border: 1px solid var(--panel2); border-radius: 18px;
-  padding: 1.2rem; width: min(28rem, 100%); max-height: calc(100dvh - 2rem); overflow: auto;
+  padding: 1.2rem; width: min(28rem, 100%); max-height: calc(100dvh / var(--ui-scale, 1) - 2rem); overflow: auto;
 }
 .sheet h2 { margin-top: 0; }
 .settings-block { margin: 0.6rem 0; }
@@ -179,7 +187,9 @@ body.left-handed .rail-right { grid-area: left; }
 }
 @media (max-width: 1023px) and (orientation: landscape) {
   .play-layout { grid-template-columns: auto 1fr auto; grid-template-rows: 1fr; grid-template-areas: "left board right"; }
-  .rail { flex-direction: column; justify-content: flex-start; max-width: 140px; }
+  /* one scrollable column: wrapping into a second column pushed the hint box off-screen */
+  .rail { flex-direction: column; flex-wrap: nowrap; justify-content: flex-start; max-width: 140px; }
+  .rail > .panel { flex-shrink: 0; max-width: 100%; margin: 0.3rem 0; }
   .rail .row.col { flex-direction: column; }
 }
 
@@ -222,7 +232,7 @@ body[data-gfx-detail="detailed"]:not(.high-contrast) .title-hero .t {
 .sh-toast {
   position: fixed; left: 50%; transform: translateX(-50%);
   bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 60;
-  max-width: min(92vw, 420px); margin: 0; padding: 10px 16px; border-radius: 10px;
+  max-width: min(calc(92vw / var(--ui-scale, 1)), 420px); margin: 0; padding: 10px 16px; border-radius: 10px;
   background: var(--panel2); color: var(--text); border: 1px solid var(--accent);
   box-shadow: 0 6px 20px rgba(0, 0, 0, .45); text-align: center;
 }
