@@ -134,7 +134,10 @@ function show(name) {
     if (name !== 'play')
         setHudVisible(false);
     const first = $(`screen-${name}`).querySelector('button, [tabindex="0"]');
-    first?.focus();
+    // preventScroll + reset: #main scrolls every screen, so a low first button
+    // must not scroll the heading away; every screen opens at its top.
+    first?.focus({ preventScroll: true });
+    $('main').scrollTop = 0;
 }
 function setHudVisible(v) {
     // HUD numbers remain visible; this just resets when leaving play

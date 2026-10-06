@@ -253,7 +253,7 @@ panel naming the direction, and an assertive live announcement. Undo → whoosh.
 ## 7. Screens and UI flow
 
 `SCREENS = ['title','modes','journey','learn','play','results','help']`; `show()` hides all but
-one, toggles the pause button, and focuses the first control on the new screen.
+one, toggles the pause button, and focuses the first control on the new screen without scrolling; `#main` is reset so each screen opens at its top.
 
 ```
 boot → title ─┬─ help ────────────────► title

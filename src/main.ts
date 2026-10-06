@@ -144,7 +144,10 @@ function show(name: string): void {
   $('btn-pause').hidden = name !== 'play';
   if (name !== 'play') setHudVisible(false);
   const first = $(`screen-${name}`).querySelector<HTMLElement>('button, [tabindex="0"]');
-  first?.focus();
+  // preventScroll + reset: #main scrolls every screen, so a low first button
+  // must not scroll the heading away; every screen opens at its top.
+  first?.focus({ preventScroll: true });
+  $('main').scrollTop = 0;
 }
 
 function setHudVisible(v: boolean): void {
