@@ -91,6 +91,8 @@ export interface StarHermitSDK {
   linkedAchievements(otherSlug: string): Promise<unknown[]>;
   leaderboards(): Promise<StarHermitBoard[]>;
   leaderboardEntries(boardId: string, opts?: { page?: number; pageSize?: number; scope?: string; region?: string }): Promise<StarHermitLeaderboardPage>;
+  /** Post a finished run's scores ({ boardKey: number }) through the game's score script; resolves the accepted keys. */
+  submitScores(scores: Record<string, number>): Promise<string[]>;
   leaderboard(key?: string | null, opts?: { page?: number; pageSize?: number; scope?: string; region?: string }): Promise<StarHermitLeaderboardPage>;
 
   mySessions(): Promise<unknown[]>;

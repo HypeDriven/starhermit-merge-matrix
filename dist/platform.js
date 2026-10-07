@@ -64,6 +64,30 @@ export async function leaderboardEntries(limit) {
     }
     return out;
 }
+/** Post a finished ranked run's total to the high-score board (score-script.js);
+ * resolves the player's rank on that board (null when unknown). */
+export async function submitScore(total) {
+    const s = sh();
+    if (!s?.signedIn || typeof s.submitScores !== 'function')
+        return { posted: false, rank: null };
+    let keys;
+    try {
+        keys = await s.submitScores({ 'high-score': total });
+    }
+    catch {
+        return { posted: false, rank: null };
+    }
+    if (!keys || !keys.includes('high-score'))
+        return { posted: false, rank: null };
+    try {
+        const page = await s.leaderboard('high-score', { pageSize: 100 });
+        const me = (page.items || []).find((i) => i.userId === s.userId);
+        return { posted: true, rank: me && typeof me.rank === 'number' ? me.rank : null };
+    }
+    catch {
+        return { posted: true, rank: null };
+    }
+}
 /* ---------------- cloud save (game:<slug> slot) ---------------- */
 export async function loadCloudSave() {
     const s = sh();

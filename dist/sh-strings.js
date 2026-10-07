@@ -7,6 +7,10 @@ const en = {
     copyFailed: 'Could not copy the invite link',
     signedOut: 'Signed out of StarHermit — progress keeps saving on this device',
     playingAs: 'Playing as {name}',
+    lbPosting: "Posting score to the leaderboard…",
+    lbRank: "Leaderboard rank: #{rank}",
+    lbPosted: "Score posted to the leaderboard.",
+    lbNotPosted: "Score not posted to the leaderboard.",
 };
 const es = {
     signIn: 'Iniciar sesión con StarHermit',
@@ -15,11 +19,16 @@ const es = {
     copyFailed: 'No se ha podido copiar el enlace de invitación',
     signedOut: 'Se ha cerrado la sesión de StarHermit: el progreso se sigue guardando en este dispositivo',
     playingAs: 'Jugando como {name}',
+    lbPosting: "Publicando la puntuación en la clasificación…",
+    lbRank: "Puesto en la clasificación: #{rank}",
+    lbPosted: "Puntuación publicada en la clasificación.",
+    lbNotPosted: "La puntuación no se ha publicado en la clasificación.",
 };
 const es419 = {
     ...es,
     copyFailed: 'No se pudo copiar el enlace de invitación',
     signedOut: 'Se cerró la sesión de StarHermit: el progreso se sigue guardando en este dispositivo',
+    lbNotPosted: "La puntuación no se publicó en la clasificación.",
 };
 const fr = {
     signIn: 'Se connecter avec StarHermit',
@@ -28,8 +37,18 @@ const fr = {
     copyFailed: 'Impossible de copier le lien d’invitation',
     signedOut: 'Déconnecté de StarHermit — la progression reste enregistrée sur cet appareil',
     playingAs: 'Vous jouez en tant que {name}',
+    lbPosting: "Envoi du score au classement…",
+    lbRank: "Rang au classement : #{rank}",
+    lbPosted: "Score publié au classement.",
+    lbNotPosted: "Score non publié au classement.",
 };
-const frCA = { ...fr, signedOut: 'Déconnecté de StarHermit — la progression reste sauvegardée sur cet appareil' };
+const frCA = {
+    ...fr,
+    signedOut: 'Déconnecté de StarHermit — la progression reste sauvegardée sur cet appareil',
+    lbPosting: "Envoi du pointage au classement…",
+    lbPosted: "Pointage publié au classement.",
+    lbNotPosted: "Pointage non publié au classement.",
+};
 export const SH_STRINGS = {
     'en-US': en,
     'en-GB': en,
@@ -42,6 +61,10 @@ export const SH_STRINGS = {
         copyFailed: 'Einladungslink konnte nicht kopiert werden',
         signedOut: 'Von StarHermit abgemeldet – der Fortschritt wird weiter auf diesem Gerät gespeichert',
         playingAs: 'Angemeldet als {name}',
+        lbPosting: "Punktzahl wird an die Bestenliste gesendet …",
+        lbRank: "Platz in der Bestenliste: #{rank}",
+        lbPosted: "Punktzahl in der Bestenliste eingetragen.",
+        lbNotPosted: "Punktzahl nicht in der Bestenliste eingetragen.",
     },
     'fr-FR': fr,
     'fr-CA': frCA,
@@ -52,6 +75,10 @@ export const SH_STRINGS = {
         copyFailed: 'Não foi possível copiar o link de convite',
         signedOut: 'Você saiu do StarHermit — o progresso continua salvo neste dispositivo',
         playingAs: 'Jogando como {name}',
+        lbPosting: "Enviando a pontuação para o ranking…",
+        lbRank: "Posição no ranking: #{rank}",
+        lbPosted: "Pontuação enviada para o ranking.",
+        lbNotPosted: "A pontuação não foi enviada para o ranking.",
     },
     'it-IT': {
         signIn: 'Accedi con StarHermit',
@@ -60,6 +87,10 @@ export const SH_STRINGS = {
         copyFailed: 'Impossibile copiare il link di invito',
         signedOut: 'Disconnesso da StarHermit: i progressi restano salvati su questo dispositivo',
         playingAs: 'Giochi come {name}',
+        lbPosting: "Invio del punteggio alla classifica…",
+        lbRank: "Posizione in classifica: #{rank}",
+        lbPosted: "Punteggio pubblicato in classifica.",
+        lbNotPosted: "Punteggio non pubblicato in classifica.",
     },
 };
 /** Best locale for navigator.languages: exact tag, then regional rules, then en-US. */

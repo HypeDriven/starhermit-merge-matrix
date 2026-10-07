@@ -35,10 +35,11 @@ grid can hold — with a seeded board that anyone can replay move for move.
 | `src/gfx.ts` | Pure graphics quality model: presets, per-effect categories, GPU → Auto preset, `resolve()`, `presetTier()`, `choosePreset()`, `describe()`, adaptive step |
 | `src/gfxtext.ts` | Graphics-section strings in the nine required locales; locale from `navigator.language` |
 | `src/audio.ts` | Three buses, authored `sfx/*.opus` one-shots with synthesis fallback, adaptive music |
-| `src/platform.ts` | StarHermit adapter over the SDK: identity, sign-in/invite, cloud save, settings KV, key bindings, read-only leaderboard |
+| `src/platform.ts` | StarHermit adapter over the SDK: identity, sign-in/invite, cloud save, settings KV, key bindings, leaderboard read + score submit |
 | `src/starhermit-sdk.d.ts` | Type declarations for the shared SDK (`window.StarHermit`) |
-| `src/sh-strings.ts` | Account strings (sign-in, invite, toasts) in the nine locales |
+| `src/sh-strings.ts` | Account strings (sign-in, invite, toasts, the results leaderboard line) in the nine locales |
 | `starhermit-sdk.js` | Shared StarHermit client (unmodified copy, loaded as a classic script) |
+| `score-script.js` | StarHermit platform script (`server=`): range-checks a ranked run's total sent through `StarHermit.submitScores` and posts it to the `high-score` leaderboard (canonical copy in the games repo's `tools/score-script.js`) |
 | `server.js` | Local static host; its legacy `/api/v1` routes (time, daily submit, leaderboard) are not called by the client |
 | `tests/rules.test.ts` | 21 vitest cases over rules + content |
 | `tests/gfx.test.ts` | 16 vitest cases over the graphics model and its locale strings |
@@ -468,7 +469,7 @@ intended string-table extraction.
 
 ## 12. StarHermit integration
 
-`starhermit.txt` declares `name=Merge Matrix`, `launch=index.html`, `server=server.js`,
+`starhermit.txt` declares `name=Merge Matrix`, `launch=index.html`, `server=score-script.js`,
 `cover=coverart.png`, the owner id, and one `control.<action>=<Code>[+<Code>] | <Label>` line
 per keyboard action (up, down, left, right, undo, hint, pause). All platform calls go through
 the shared client `starhermit-sdk.js` (copied unchanged to the repo root, loaded by
@@ -484,18 +485,16 @@ hosted mode means signed in. Per https://wiki.starhermit.com/ conventions the ga
 | Settings KV | Every preference (volumes, mute, theme, graphics, motion, contrast, text size, left-handed, hold-to-repeat, haptics, captions, 3D view) is patched to the per-player settings store on change (changed keys only); at boot the stored values override the local ones. |
 | Controls | Keyboard input is routed by `event.code` through `StarHermit.loadBindings()` (defaults = the manifest lines); the Help "Controls" card and the Undo/Hint key chips show the effective keys. |
 | Invite link | Signed-in players get **Invite a friend** on the title, copying `StarHermit.inviteLink()` with a confirmation toast. |
-| Leaderboards | Read-only: the game's first platform board when one exists (`StarHermit.leaderboard()`, names via profiles). No board (local dev/offline) → the rail shows local records only. Personal bests are kept locally and cloud-saved. |
+| Leaderboards | Signed in, every finished ranked run (Daily and Score chase) posts its total through `StarHermit.submitScores` (a practice session whose `score-script.js` posts it to the `high-score` board: integer, higher is better, 0–1,000,000) and the results screen shows "Leaderboard rank: #N" (or posted / not posted) in `#res-lb`; unranked modes and standalone play post nothing. The Daily rail lists the game's first platform board (`StarHermit.leaderboard()`, names via profiles). No board (local dev/offline) → the rail shows local records only. Personal bests are kept locally and cloud-saved. |
 | Achievements | Evaluated and stored locally in `mm-progress-v1` (five definitions in `content.ts`), mirrored through the cloud save. |
 | Standalone | No launch token → zero own-server requests: local clock, the daily result is kept as a local personal best. `server.js` only hosts the static build for local dev (its legacy replay-validated `POST /api/v1/daily/submit` is no longer called). |
 
 Account strings are localized in the nine locales (`src/sh-strings.ts`).
 
-Not used: platform sessions, matchmaking, friend-picker invites, chat, replays, presence,
-real-time multiplayer and purchases — Merge Matrix is single-player and `server.js` is a
-standalone Node host, not a platform game script, so it reports no scores, achievements or
-replays. All modes except Daily are fully local; when the dev backend is unreachable the
-client keeps playing and reports "Daily score stored locally; replay validation unavailable
-here (casual board)".
+Not used: matchmaking, friend-picker invites, chat, replays, presence, real-time multiplayer,
+purchases and platform achievements — Merge Matrix is single-player; the only platform session
+is the one-message practice session that posts a ranked score (client-reported, range-checked,
+not replay-validated). `server.js` is a standalone Node host for local dev.
 
 ---
 
@@ -505,7 +504,7 @@ here (casual board)".
 only `rules`; `session.ts` owns persistence and is the single validated command path
 (`command`, `commandUndo`) that both UI and replay use; `platform.ts` owns the StarHermit
 contract (over the shared SDK: identity, cloud save, settings KV, bindings, sign-in/invite,
-read-only leaderboard) and is the only module that reads auth state; `main.ts` is the only module that
+leaderboard read + score submit) and is the only module that reads auth state; `main.ts` is the only module that
 touches `document` for flow control; `render.ts` consumes immutable board snapshots and never
 writes state; `audio.ts` is fire-and-forget.
 
@@ -631,12 +630,12 @@ generated label textures, and the game has no characters.
 * Merged-cell highlighting in 3D is inferred by diffing board values rather than tracking tile
   identities, so a spawn adjacent to a merge can occasionally miss its pulse; tiles teleport to
   their end cells instead of sliding.
-* Score chase is labelled "ranked" in the UI but submits nothing: only Daily posts to the
-  server, so its board is local-best only.
-* The platform leaderboard is read-only (clients cannot submit), has no friends filter, and
-  falls back to local records when no board is configured or the network is down.
-* `res-board-note` reports "stored locally" on an unreachable server, but there is no retry
-  queue: an offline daily result is never submitted later.
+* Daily and Score chase share one `high-score` board (different seeds), and posted totals are
+  range-checked but not replay-validated.
+* The platform leaderboard has no friends filter, and the Daily rail falls back to local records
+  when no board is configured or the network is down.
+* There is no retry queue: a ranked result that fails to post ("Score not posted to the
+  leaderboard.") is never submitted later.
 * The `holdToRepeat` setting exists in the settings model with no UI control and no behaviour.
 * `content.difficultyOf` double-counts mastery (`if (!s.mastery === false) d += 5` immediately
   before `if (s.mastery) d += 10`), so it is a rough ordering rather than a calibrated curve;
@@ -649,8 +648,8 @@ generated label textures, and the game has no characters.
   a keyed table per locale, mark up static markup with `data-i18n`, choose the locale from a
   persisted setting defaulting to `navigator.languages`, set `<html lang>` accordingly, and
   format numbers through `Intl.NumberFormat`.
-* **Ranked score chase.** Intent: submit the score-chase replay through the same validated
-  endpoint as Daily, with its own board keyed by the fixed seed.
+* **Validated ranked boards.** Intent: replay-validate posted Daily and Score chase runs in the
+  platform script, with a separate board per mode.
 * **Friends leaderboard filter.** Intent: request the host identity/friends graph and filter the
   entries panel, which is why the panel is titled generically today.
 * **Per-tile slide animation.** Intent: track tile identity across a move so blocks travel to

@@ -37,13 +37,25 @@ async function syncServerTime(): Promise<void> {
 function serverNow(): number { return Date.now() + serverOffsetMs; }
 
 function noteDailyResult(): void {
-  // Platform boards are read-only and there is no own server: the daily score
-  // is kept as a personal best (cloud-synced when signed in).
+  // The daily score is kept as a personal best (cloud-synced when signed in);
+  // signed in, it is also posted to the high-score board (postToLeaderboard).
   const note = $('res-board-note');
   note.hidden = false;
   note.textContent = platform.isHosted()
-    ? 'Daily score kept as your personal best and synced to your account (platform boards are read-only).'
+    ? 'Daily score kept as your personal best and synced to your account.'
     : 'Daily score stored locally as your personal best.';
+}
+
+/** Signed in, ranked runs (Daily, Score chase) post their total to the high-score board. */
+function postToLeaderboard(total: number): void {
+  const line = $('res-lb');
+  if (!platform.isHosted()) { line.hidden = true; return; }
+  line.hidden = false;
+  line.textContent = shT.lbPosting;
+  void platform.submitScore(total).then((r) => {
+    line.textContent = !r.posted ? shT.lbNotPosted
+      : r.rank ? shT.lbRank.replace('{rank}', String(r.rank)) : shT.lbPosted;
+  });
 }
 
 async function loadLeaderboard(): Promise<void> {
@@ -282,6 +294,7 @@ function finishRun(): void {
   cmp.textContent = total > prevBest ? 'New personal best for this board.' : `Personal best here: ${prevBest}.`;
   if (total > prevBest && newAch.length === 0) audio.sfx.newBest();
   $('res-board-note').hidden = true;
+  if (sess.ranked) postToLeaderboard(total); else $('res-lb').hidden = true;
 
   const nextBtn = $('btn-next');
   if (sess.mode === 'journey' && st.won) {
@@ -578,10 +591,10 @@ function openModeSetup(mode: string): void {
   const rulesText: Record<string, string> = {
     practice: 'Unranked · undo allowed · about 5–15 minutes · solo.',
     challenge: 'Unranked · constrained goal · undo allowed except speed · solo.',
-    score: 'Ranked locally · shared seed · no undo · one board per difficulty.',
+    score: 'Ranked · shared seed · no undo · one board per difficulty.',
   };
   $('mode-rules').textContent = rulesText[mode] ?? '';
-  $('ranked-note').textContent = mode === 'score' ? 'This result is submitted to the score-chase leaderboard.' : 'This run does not affect competitive rating.';
+  $('ranked-note').textContent = mode === 'score' ? 'Signed in, this result is posted to the high-score leaderboard.' : 'This run does not affect competitive rating.';
   $('btn-mode-start').focus();
 }
 

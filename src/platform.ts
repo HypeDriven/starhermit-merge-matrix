@@ -67,7 +67,7 @@ export function loadBindings<T extends Record<string, string[]>>(defaults: T): P
   return isHosted() ? sh()!.loadBindings(defaults) : Promise.resolve(defaults);
 }
 
-/* ---------------- leaderboards (read-only) ---------------- */
+/* ---------------- leaderboards ---------------- */
 
 export interface BoardEntry { name: string; score: number }
 
@@ -83,6 +83,21 @@ export async function leaderboardEntries(limit: number): Promise<BoardEntry[] | 
     out.push({ name: p ? p.displayName : 'Player ?', score: Number(e.score ?? 0) });
   }
   return out;
+}
+
+/** Post a finished ranked run's total to the high-score board (score-script.js);
+ * resolves the player's rank on that board (null when unknown). */
+export async function submitScore(total: number): Promise<{ posted: boolean; rank: number | null }> {
+  const s = sh();
+  if (!s?.signedIn || typeof s.submitScores !== 'function') return { posted: false, rank: null };
+  let keys: string[];
+  try { keys = await s.submitScores({ 'high-score': total }); } catch { return { posted: false, rank: null }; }
+  if (!keys || !keys.includes('high-score')) return { posted: false, rank: null };
+  try {
+    const page = await s.leaderboard('high-score', { pageSize: 100 });
+    const me = (page.items || []).find((i) => i.userId === s.userId);
+    return { posted: true, rank: me && typeof me.rank === 'number' ? me.rank : null };
+  } catch { return { posted: true, rank: null }; }
 }
 
 /* ---------------- cloud save (game:<slug> slot) ---------------- */
