@@ -31,7 +31,7 @@ export function ensureAudio() {
         for (const b of ['music', 'fx', 'ambience']) {
             const g = ctx.createGain();
             g.connect(master);
-            buses[b] = g;
+            buses[b] = (globalThis.GameOptions ? globalThis.GameOptions.tagBus(g, b) : g);
         }
         applyVolumes();
         startAmbience();
@@ -65,7 +65,7 @@ function tone(bus, freq, dur, type, gain, when = 0, slideTo) {
     if (!ctx || !buses[bus])
         return;
     const t0 = ctx.currentTime + when;
-    const o = ctx.createOscillator();
+    const o = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(ctx.createOscillator(), bus) : ctx.createOscillator());
     const g = ctx.createGain();
     o.type = type;
     o.frequency.setValueAtTime(freq, t0);
@@ -86,7 +86,7 @@ function noiseBurst(bus, dur, gain, filterFreq) {
     const data = buf.getChannelData(0);
     for (let i = 0; i < len; i++)
         data[i] = (Math.random() * 2 - 1) * (1 - i / len);
-    const src = ctx.createBufferSource();
+    const src = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(ctx.createBufferSource(), bus) : ctx.createBufferSource());
     src.buffer = buf;
     const f = ctx.createBiquadFilter();
     f.type = 'lowpass';
@@ -133,7 +133,7 @@ function playSample(name) {
     if (!ctx || !buses.fx)
         return false;
     if (sampleState.get(name) === 'ready') {
-        const src = ctx.createBufferSource();
+        const src = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(ctx.createBufferSource(), name) : ctx.createBufferSource());
         src.buffer = sampleBuffers.get(name);
         src.connect(buses.fx);
         src.start();
@@ -230,10 +230,10 @@ export const sfx = {
 function startAmbience() {
     if (!ctx || !buses.ambience || ambienceNodes)
         return;
-    const o1 = ctx.createOscillator();
-    const o2 = ctx.createOscillator();
+    const o1 = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(ctx.createOscillator(), null) : ctx.createOscillator());
+    const o2 = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(ctx.createOscillator(), null) : ctx.createOscillator());
     const g = ctx.createGain();
-    const lfo = ctx.createOscillator();
+    const lfo = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(ctx.createOscillator(), null) : ctx.createOscillator());
     const lfoG = ctx.createGain();
     o1.type = 'sine';
     o1.frequency.value = 55;

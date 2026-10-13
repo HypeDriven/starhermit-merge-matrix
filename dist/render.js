@@ -862,7 +862,7 @@ export function frame(time) {
     }
     if (composer) {
         try {
-            composer.render(dt);
+            (globalThis.GameOptions ? globalThis.GameOptions.draw(composer.renderer, () => composer.render(dt)) : composer.render(dt));
             return;
         }
         catch {
@@ -871,7 +871,7 @@ export function frame(time) {
             composer = null;
         }
     }
-    renderer.render(scene, camera);
+    (globalThis.GameOptions ? globalThis.GameOptions.draw(renderer, () => renderer.render(scene, camera)) : renderer.render(scene, camera));
 }
 export function resize(w, h, devicePixelRatio) {
     if (!renderer || !camera)
