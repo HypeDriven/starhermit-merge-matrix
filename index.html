@@ -12,11 +12,14 @@
 <script src="ui-scale.js"></script>
 <script src="browser-guard.js"></script>
 <script src="starhermit-sdk.js"></script>
+<script src="sh-language.js"></script>
+<script src="lang/strings.js"></script>
+<script src="lang/i18n.js"></script>
 </head>
 <body>
 <div id="app">
   <header id="topbar" role="banner">
-    <h1 id="brand">Merge Matrix</h1>
+    <h1 id="brand" data-i18n-skip>Merge Matrix</h1>
     <div id="statusbar" role="status" aria-live="polite">
       <span id="hud-score-label">Score</span> <strong id="hud-score">0</strong>
       <span id="hud-best-label">Best</span> <strong id="hud-best">0</strong>
@@ -44,8 +47,8 @@
         <button id="btn-journey" class="btn">Journey <span id="journey-progress" class="note"></span></button>
         <button id="btn-learn" class="btn">Learn</button>
         <button id="btn-help" class="btn">How to play</button>
-        <button id="btn-signin" class="btn" hidden>Sign in with StarHermit</button>
-        <button id="btn-invite" class="btn" hidden>Invite a friend</button>
+        <button id="btn-signin" class="btn" hidden data-i18n-skip>Sign in with StarHermit</button>
+        <button id="btn-invite" class="btn" hidden data-i18n-skip>Invite a friend</button>
       </nav>
       <p id="profile-line" class="note"><span id="profile-name">Guest profile</span> · <span id="sync-status">progress saves on this device</span></p>
     </section>
@@ -140,8 +143,8 @@
         </div>
         <aside class="rail rail-right">
           <div class="row col">
-            <button id="btn-undo" class="btn small">Undo <span class="kbd" data-key="undo">Z</span></button>
-            <button id="btn-hint" class="btn small">Hint <span class="kbd" data-key="hint">H</span></button>
+            <button id="btn-undo" class="btn small">Undo <span class="kbd" data-key="undo" data-i18n-skip>Z</span></button>
+            <button id="btn-hint" class="btn small">Hint <span class="kbd" data-key="hint" data-i18n-skip>H</span></button>
             <button id="btn-restart" class="btn small">Restart</button>
             <button id="btn-leave" class="btn small danger">Leave</button>
           </div>
@@ -192,6 +195,8 @@
       <div class="sheet">
         <h2 id="pause-h">Paused</h2>
         <button id="btn-resume-play" class="btn primary">Resume</button>
+        <!-- Settings groups; the shared frame-rate, Language, Sound and Report sections (game-options.js) mount at its end. -->
+        <div class="settings-groups" data-options-graphics>
         <details class="settings-block">
           <summary>Audio</summary>
           <label>Music <input type="range" id="set-music" min="0" max="100" value="50"></label>
@@ -205,7 +210,7 @@
           <label>Theme <select id="set-theme"></select></label>
           <label class="check"><input type="checkbox" id="set-render3d" checked> 3D board (WebGL)</label>
           <p id="gfx-gl-off" class="note" hidden></p>
-          <div id="gfx-controls" class="gfx-controls">
+          <div id="gfx-controls" class="gfx-controls" data-i18n-skip>
             <label class="gfx-row"><span id="gfx-quality-label">Quality</span>
               <select id="set-quality" data-gfx="preset">
                 <option value="auto">Auto</option>
@@ -234,6 +239,7 @@
           <label class="check"><input type="checkbox" id="set-haptics"> Haptics on touch</label>
           <button id="btn-replay-tutorial" class="btn small">Replay tutorial</button>
         </details>
+        </div>
         <div class="row" id="pause-run-actions">
           <button id="btn-pause-restart" class="btn">Restart run</button>
           <button id="btn-pause-leave" class="btn danger">Leave run</button>

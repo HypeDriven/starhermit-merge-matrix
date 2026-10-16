@@ -1,9 +1,10 @@
 /**
  * Merge Matrix — strings for the Graphics settings section, in every required
- * locale. The locale follows navigator.language (the game has no language
- * setting); unknown languages fall back to en-US.
+ * locale. The locale follows the game language (lang/i18n.js, Settings →
+ * Language); unknown languages fall back to en-US.
  */
 import type { DescribeWords } from './gfx.js';
+import { lang } from './i18n.js';
 
 export interface GfxText extends DescribeWords {
   quality: string; auto: string; low: string; balanced: string; high: string; ultra: string;
@@ -112,6 +113,5 @@ export function pickLocale(tag: string | null | undefined): string {
 }
 
 export function gfxText(tag?: string): GfxText {
-  const nav = typeof navigator !== 'undefined' ? navigator.language : 'en-US';
-  return GFX_LOCALES[pickLocale(tag ?? nav)];
+  return GFX_LOCALES[pickLocale(tag ?? lang())];
 }

@@ -3,6 +3,7 @@ import { legalMoves } from './rules.js';
 import { CATEGORIES, CATEGORY_KEYS, PRESETS, resolve, presetTier, choosePreset, clamp } from './gfx.js';
 import { gfxText } from './gfxtext.js';
 import * as render from './render.js';
+import { T } from './i18n.js';
 export function themeById(id) {
     return THEMES.find((t) => t.id === id) ?? THEMES[0];
 }
@@ -53,7 +54,7 @@ export function renderDomBoard(el, st, theme) {
             cell.textContent = v === 0 ? '' : String(v);
             cell.style.background = v === 0 ? '' : tileColorOf(theme, v);
             cell.style.color = theme.textLight ? '#fff' : '#1b2540';
-            cell.setAttribute('aria-label', v === 0 ? `empty, row ${r + 1} column ${c + 1}` : `${v}, row ${r + 1} column ${c + 1}`);
+            cell.setAttribute('aria-label', v === 0 ? T('empty, row {r} column {c}', { r: r + 1, c: c + 1 }) : T('{v}, row {r} column {c}', { v, r: r + 1, c: c + 1 }));
         }
     }
 }
@@ -70,7 +71,7 @@ export function boardSummary(st) {
         }
     const parts = [...counts.entries()].sort((a, b) => b[0] - a[0]).slice(0, 5)
         .map(([v, n]) => `${n}×${v}`);
-    return `${st.size}×${st.size} board, ${empty} empty cells, tiles: ${parts.join(', ')}. Largest ${st.maxTile}.`;
+    return T('{size}×{size} board, {empty} empty cells, tiles: {tiles}. Largest {max}.', { size: st.size, empty, tiles: parts.join(', '), max: st.maxTile });
 }
 let boundSettings = null;
 let formSync = null;
@@ -89,7 +90,7 @@ export function bindSettingsForm(s, onChange) {
     for (const t of THEMES) {
         const o = document.createElement('option');
         o.value = t.id;
-        o.textContent = t.name;
+        o.textContent = T(t.name);
         themeSel.appendChild(o);
     }
     const sync = () => {
@@ -128,6 +129,27 @@ const gid = (id) => document.getElementById(id);
 function presetName(p) {
     const t = gfxText();
     return t[p] ?? p;
+}
+/** Relabel the settings controls built in code (theme names, Graphics labels) in the current language. */
+export function relabelSettingsForm() {
+    const themeSel = document.getElementById('set-theme');
+    if (themeSel)
+        for (const o of Array.from(themeSel.options))
+            o.textContent = T(themeById(o.value).name);
+    const t = gfxText();
+    gid('gfx-quality-label').textContent = t.quality;
+    gid('gfx-scale-label').textContent = t.renderScale;
+    gid('gfx-adaptive-label').textContent = t.adaptive;
+    gid('gfx-fps-label').textContent = t.showFps;
+    for (const cat of CATEGORY_KEYS) {
+        const sel = document.getElementById(`set-gfx-${cat}`);
+        if (!sel)
+            continue;
+        sel.previousElementSibling.textContent = t.cat[cat] ?? cat;
+        for (const o of Array.from(sel.options))
+            if (o.value !== 'preset')
+                o.textContent = t.tier[o.value] ?? o.value;
+    }
 }
 /** Build the per-category selects once, then wire every Graphics control. */
 function bindGraphicsForm(s, emit) {
@@ -226,13 +248,15 @@ export function refreshGraphicsSummary(glActive) {
 export function buildHelpCards(el, keys) {
     el.textContent = '';
     const cards = [
-        ['Slide', 'Arrow keys, WASD, swipe, or the on-board drag. Every block slides until it hits the edge or another block.'],
-        ['Merge', 'Two blocks with the same number that collide combine into one of double value. Each block merges at most once per move.'],
-        ['New blocks', 'After every valid move, a new 2 (90%) or 4 (10%) appears in a random empty cell, chosen by the run\'s seed.'],
-        ['Scoring', 'You score the value of every merge. Reaching the goal tile adds a milestone bonus; constrained modes add an efficiency bonus.'],
-        ['Losing', 'The run ends when no move changes the board — a full grid with no adjacent equals.'],
-        ['Controls', `${keys('up')} ${keys('left')} ${keys('down')} ${keys('right')}: slide · ${keys('undo')}: undo (where allowed) · ${keys('hint')}: hint · ${keys('pause')}: pause · swipe or drag on the board · every action also has a button.`],
-        ['Seeds & fairness', 'Practice and Journey seeds are fixed. The daily seed is shared per UTC day, so everyone plays the same board.'],
+        [T('Slide'), T('Arrow keys, WASD, swipe, or the on-board drag. Every block slides until it hits the edge or another block.')],
+        [T('Merge'), T('Two blocks with the same number that collide combine into one of double value. Each block merges at most once per move.')],
+        [T('New blocks'), T('After every valid move, a new 2 (90%) or 4 (10%) appears in a random empty cell, chosen by the run’s seed.')],
+        [T('Scoring'), T('You score the value of every merge. Reaching the goal tile adds a milestone bonus; constrained modes add an efficiency bonus.')],
+        [T('Losing'), T('The run ends when no move changes the board — a full grid with no adjacent equals.')],
+        [T('Controls'), T('{slide}: slide · {undo}: undo (where allowed) · {hint}: hint · {pause}: pause · swipe or drag on the board · every action also has a button.', {
+                slide: `${keys('up')} ${keys('left')} ${keys('down')} ${keys('right')}`, undo: keys('undo'), hint: keys('hint'), pause: keys('pause'),
+            })],
+        [T('Seeds & fairness'), T('Practice and Journey seeds are fixed. The daily seed is shared per UTC day, so everyone plays the same board.')],
     ];
     for (const [h, body] of cards) {
         const d = document.createElement('div');
@@ -265,8 +289,8 @@ export function computeHint(st) {
             best = { dir: d, gain, empties };
     }
     if (!best)
-        return { dir: legal[0], why: 'only legal direction' };
-    return { dir: best.dir, why: `frees ${best.empties} cells with the best immediate merges` };
+        return { dir: legal[0], why: T('only legal direction') };
+    return { dir: best.dir, why: T('frees {n} cells with the best immediate merges', { n: best.empties }) };
 }
 // lazy import to avoid a cycle at module init
 import { peekMove } from './rules.js';

@@ -3,6 +3,7 @@
  * Events prefer authored one-shot samples (sfx/*.opus, see sfx/manifest.json)
  * and fall back to runtime synthesis while a sample loads or is missing.
  */
+import { T } from './i18n.js';
 import type { Settings } from './session.js';
 
 type BusName = 'music' | 'fx' | 'ambience';
@@ -26,8 +27,9 @@ export function onCaption(cb: (text: string) => void): void {
   captionCb = cb;
 }
 
-function caption(text: string): void {
-  if (settings?.captions && captionCb) captionCb(text);
+/** Caption keys are English; T() shows them in the game language. */
+function caption(text: string, vars?: Record<string, string | number>): void {
+  if (settings?.captions && captionCb) captionCb(T(text, vars));
 }
 
 export function ensureAudio(): void {
@@ -174,7 +176,7 @@ export const sfx = {
       tone('fx', variant(f, seed), 0.12, 'triangle', 0.22);
       tone('fx', variant(f * 1.5, seed + 7), 0.14, 'sine', 0.14, 0.03);
     }
-    caption(`merge ${value}`);
+    caption('merge {value}', { value });
   },
   invalid(): void {
     if (!playSample(SAMPLE_MAP.invalid as string)) tone('fx', 140, 0.12, 'sawtooth', 0.08);
@@ -206,7 +208,7 @@ export const sfx = {
   },
   countdown(n: number): void {
     if (!playSample(SAMPLE_MAP.countdown as string)) tone('fx', 440 + n * 40, 0.08, 'sine', 0.14);
-    caption(`countdown ${n}`);
+    caption('countdown {n}', { n });
   },
   countdownGo(): void {
     if (!playSample(SAMPLE_MAP.countdownGo as string)) {

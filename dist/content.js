@@ -3,55 +3,56 @@
  * All content is generated deterministically from authored parameters, then validated offline.
  */
 import { createGame, applyMove, legalMoves } from './rules.js';
+import { N } from './i18n.js';
 export const CONTENT_VERSION = 1;
 export const THEMES = [
     {
-        id: 'matrix', name: 'Dark Matrix', bg: '#0a0e1a', grid: '#131b2e', cell: '#1d2942',
+        id: 'matrix', name: N('Dark Matrix'), bg: '#0a0e1a', grid: '#131b2e', cell: '#1d2942',
         tiles: { 0: '#3b82f6', 2: '#22407a', 4: '#2b5cb8', 8: '#3f8cff', 16: '#37b6ff', 32: '#41d9c0', 64: '#5ee6a8', 128: '#ffe066', 256: '#ffb84d', 512: '#ff8c5a', 1024: '#ff5a7a', 2048: '#e14dff', 4096: '#9d5cff' },
         textLight: true, accent: '#41d9c0',
     },
     {
-        id: 'ember', name: 'Ember Glass', bg: '#170d0a', grid: '#241310', cell: '#331b16',
+        id: 'ember', name: N('Ember Glass'), bg: '#170d0a', grid: '#241310', cell: '#331b16',
         tiles: { 0: '#ff8c5a', 2: '#5a2a1d', 4: '#7a3520', 8: '#a34a24', 16: '#c95f2c', 32: '#e8762f', 64: '#ff9040', 128: '#ffb84d', 256: '#ffe066', 512: '#fff3a0', 1024: '#ff5a5a', 2048: '#ff2d78', 4096: '#c95cff' },
         textLight: true, accent: '#ffb84d',
     },
     {
-        id: 'verdant', name: 'Verdant Circuit', bg: '#0a140d', grid: '#11241a', cell: '#183325',
+        id: 'verdant', name: N('Verdant Circuit'), bg: '#0a140d', grid: '#11241a', cell: '#183325',
         tiles: { 0: '#5ee6a8', 2: '#1d4a33', 4: '#276344', 8: '#31805a', 16: '#3ea873', 32: '#52d491', 64: '#7df0ae', 128: '#b8f7c9', 256: '#e3f9a0', 512: '#ffe066', 1024: '#ffb84d', 2048: '#41d9c0', 4096: '#37b6ff' },
         textLight: true, accent: '#5ee6a8',
     },
     {
-        id: 'mono', name: 'High Contrast', bg: '#000000', grid: '#111111', cell: '#222222',
+        id: 'mono', name: N('High Contrast'), bg: '#000000', grid: '#111111', cell: '#222222',
         tiles: { 0: '#ffffff', 2: '#444444', 4: '#666666', 8: '#888888', 16: '#aaaaaa', 32: '#cccccc', 64: '#ffffff', 128: '#ffdf00', 256: '#00e5ff', 512: '#00ff85', 1024: '#ff6d00', 2048: '#ff00a8', 4096: '#b388ff' },
         textLight: true, accent: '#ffffff',
     },
     {
-        id: 'paper', name: 'Light Paper', bg: '#e8e6df', grid: '#d4d1c6', cell: '#c2beb1',
+        id: 'paper', name: N('Light Paper'), bg: '#e8e6df', grid: '#d4d1c6', cell: '#c2beb1',
         tiles: { 0: '#3056a3', 2: '#eee4da', 4: '#ede0c8', 8: '#f2b179', 16: '#f59563', 32: '#f67c5f', 64: '#f65e3b', 128: '#edcf72', 256: '#edcc61', 512: '#edc850', 1024: '#3056a3', 2048: '#25427e', 4096: '#1b3059' },
         textLight: false, accent: '#3056a3',
     },
 ];
 export const ACHIEVEMENTS = [
-    { key: 'first-clear', name: 'First Light', desc: 'Complete your first stage or reach your first goal tile.' },
-    { key: 'mechanic-mastery', name: 'Matrix Adept', desc: 'Complete a mastery stage in Journey.' },
-    { key: 'streak-7', name: 'Seven-Day Circuit', desc: 'Play the daily challenge on 7 different days.' },
-    { key: 'tile-4096', name: 'Deep Signal', desc: 'Create a 4096 tile in any mode.' },
-    { key: 'journey-half', name: 'Long Haul', desc: 'Complete 20 Journey stages. Any settings, any assists.' },
+    { key: 'first-clear', name: N('First Light'), desc: N('Complete your first stage or reach your first goal tile.') },
+    { key: 'mechanic-mastery', name: N('Matrix Adept'), desc: N('Complete a mastery stage in Journey.') },
+    { key: 'streak-7', name: N('Seven-Day Circuit'), desc: N('Play the daily challenge on 7 different days.') },
+    { key: 'tile-4096', name: N('Deep Signal'), desc: N('Create a 4096 tile in any mode.') },
+    { key: 'journey-half', name: N('Long Haul'), desc: N('Complete 20 Journey stages. Any settings, any assists.') },
 ];
 export const LESSONS = [
     {
-        id: 'lesson-slide', index: 0, title: 'Slide the matrix',
-        text: 'Use arrow keys, WASD, or swipe to slide every block. Blocks move as far as they can. Make 3 moves to continue.',
+        id: 'lesson-slide', index: 0, title: N('Slide the matrix'),
+        text: N('Use arrow keys, WASD, or swipe to slide every block. Blocks move as far as they can. Make 3 moves to continue.'),
         seed: 101, goalTile: 64, requireMoves: 3, hintDir: 'left',
     },
     {
-        id: 'lesson-merge', index: 1, title: 'Merge equals',
-        text: 'When two blocks with the same number collide, they combine into one worth twice as much — and you score the new value. Make 4 moves and merge at least once.',
+        id: 'lesson-merge', index: 1, title: N('Merge equals'),
+        text: N('When two blocks with the same number collide, they combine into one worth twice as much — and you score the new value. Make 4 moves and merge at least once.'),
         seed: 202, goalTile: 64, requireMoves: 4,
     },
     {
-        id: 'lesson-survive', index: 2, title: 'Mind the empty cells',
-        text: 'After every move a new block appears. If the matrix fills with no merges left, the run ends. Reach a 32 tile to finish training.',
+        id: 'lesson-survive', index: 2, title: N('Mind the empty cells'),
+        text: N('After every move a new block appears. If the matrix fills with no merges left, the run ends. Reach a 32 tile to finish training.'),
         seed: 303, goalTile: 32, requireMoves: 0,
     },
 ];

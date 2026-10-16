@@ -4,10 +4,14 @@
  * starhermit-sdk.d.ts). The SDK owns the launch token + renewal, sign-in,
  * profiles, the game:<slug> cloud-save slot, the settings KV and key
  * bindings. Hosted mode = signed in. Without a token every entry point
- * no-ops and local play is unchanged.
+ * no-ops and local play is unchanged. Cloud writes after a load are
+ * conditional: when another device saved first the SDK emits 'saveconflict',
+ * and the registered merge handler reconciles the reloaded cloud document
+ * with local progress before it is saved again.
  */
 
 import type { StarHermitSDK, StarHermitAuthEvent } from './starhermit-sdk.js';
+import { T } from './i18n.js';
 
 export interface PlatformInfo {
   hosted: boolean;
@@ -20,6 +24,7 @@ export type SyncState = 'synced' | 'saving' | 'offline';
 let sdk: StarHermitSDK | null = null;
 let nickname = '';
 let syncCb: ((s: SyncState) => void) | null = null;
+let mergeCb: ((remote: unknown) => unknown) | null = null;
 const authCbs: ((e: StarHermitAuthEvent) => void)[] = [];
 
 function sh(): StarHermitSDK | null {
@@ -40,6 +45,24 @@ export function onSyncStatus(cb: (s: SyncState) => void): void {
 
 export function onAuth(cb: (e: StarHermitAuthEvent) => void): void {
   authCbs.push(cb);
+}
+
+/** Register the merge for a lost conditional write: given the reloaded cloud
+ * document, return the merged document to save (or null to skip saving). */
+export function onSaveConflict(cb: (remote: unknown) => unknown): void {
+  mergeCb = cb;
+}
+
+/** Another device saved since our last load: reload, merge, save the merge. */
+export async function resolveConflict(): Promise<void> {
+  const s = sh();
+  if (!s?.signedIn) return;
+  const remote = await s.loadJSON();
+  const doc = mergeCb ? mergeCb(remote) : null;
+  if (doc != null && !s.saveConflicted()) {
+    setSync('saving');
+    s.saveJSON(doc, 0);
+  }
 }
 
 function setSync(s: SyncState): void {
@@ -80,7 +103,7 @@ export async function leaderboardEntries(limit: number): Promise<BoardEntry[] | 
   const out: BoardEntry[] = [];
   for (const e of page.items.slice(0, limit)) {
     const p = e.userId ? await s.profile(String(e.userId)) : null;
-    out.push({ name: p ? p.displayName : 'Player ?', score: Number(e.score ?? 0) });
+    out.push({ name: p ? p.displayName : T('Player'), score: Number(e.score ?? 0) });
   }
   return out;
 }
@@ -166,6 +189,7 @@ export async function initPlatform(inject?: StarHermitSDK): Promise<PlatformInfo
   if (!s) return { hosted: false, userId: '', nickname: '' };
   s.init();
   s.on('saved', (ok) => setSync(ok ? 'synced' : 'offline'));
+  s.on('saveconflict', () => { void resolveConflict(); });
   s.on('auth', (e) => {
     if (!e.signedIn) nickname = '';
     for (const cb of authCbs) cb(e);
@@ -177,7 +201,7 @@ export async function initPlatform(inject?: StarHermitSDK): Promise<PlatformInfo
   }
   if (s.signedIn) {
     const p = await s.profile();
-    nickname = p ? p.displayName : 'Player ' + String(s.userId).slice(0, 6);
+    nickname = p ? p.displayName : T('Player {id}', { id: String(s.userId).slice(0, 6) });
   }
   return { hosted: s.signedIn, userId: s.userId ?? '', nickname };
 }

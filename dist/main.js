@@ -9,6 +9,7 @@ import * as render from './render.js';
 import * as ui from './ui.js';
 import * as platform from './platform.js';
 import { shStrings } from './sh-strings.js';
+import { T, N, lang, onLanguage } from './i18n.js';
 const $ = (id) => document.getElementById(id);
 let settings = session.loadSettings();
 let progress = session.loadProgress();
@@ -34,8 +35,8 @@ function noteDailyResult() {
     const note = $('res-board-note');
     note.hidden = false;
     note.textContent = platform.isHosted()
-        ? 'Daily score kept as your personal best and synced to your account.'
-        : 'Daily score stored locally as your personal best.';
+        ? T('Daily score kept as your personal best and synced to your account.')
+        : T('Daily score stored locally as your personal best.');
 }
 /** Signed in, ranked runs (Daily, Score chase) post their total to the high-score board. */
 function postToLeaderboard(total) {
@@ -45,20 +46,33 @@ function postToLeaderboard(total) {
         return;
     }
     line.hidden = false;
-    line.textContent = shT.lbPosting;
-    void platform.submitScore(total).then((r) => {
-        line.textContent = !r.posted ? shT.lbNotPosted
-            : r.rank ? shT.lbRank.replace('{rank}', String(r.rank)) : shT.lbPosted;
-    });
+    lbResult = null;
+    renderLeaderboardLine();
+    void platform.submitScore(total).then((r) => { lbResult = r; renderLeaderboardLine(); });
 }
+let lbResult = null;
+function renderLeaderboardLine() {
+    const line = $('res-lb');
+    if (line.hidden)
+        return;
+    const r = lbResult;
+    line.textContent = !r ? shT().lbPosting : !r.posted ? shT().lbNotPosted
+        : r.rank ? shT().lbRank.replace('{rank}', String(r.rank)) : shT().lbPosted;
+}
+let boardEntries = null;
 async function loadLeaderboard() {
-    const panel = $('friends-panel');
+    $('friends-panel').hidden = false;
+    boardEntries = null;
+    renderLeaderboardPanel();
+    boardEntries = platform.isHosted() ? await platform.leaderboardEntries(10) : null;
+    renderLeaderboardPanel();
+}
+function renderLeaderboardPanel() {
     const ol = $('leaderboard-list');
     ol.textContent = '';
-    panel.hidden = false;
     const sess = session.getActive();
     const best = sess ? progress.bestScores[sess.contentId] ?? 0 : 0;
-    const entries = platform.isHosted() ? await platform.leaderboardEntries(10) : null;
+    const entries = boardEntries;
     if (entries) {
         for (const e of entries) {
             const li = document.createElement('li');
@@ -69,15 +83,16 @@ async function loadLeaderboard() {
     else {
         // no platform board (local dev / offline / none configured): local records only
         const li = document.createElement('li');
-        li.textContent = `Personal best: ${best}`;
+        li.textContent = T('Personal best: {n}', { n: best });
         ol.appendChild(li);
         const note = document.createElement('li');
-        note.textContent = '(global leaderboard unavailable — local records only)';
+        note.textContent = T('(global leaderboard unavailable — local records only)');
         ol.appendChild(note);
     }
 }
 /* ---------------- account (sign-in / invite) ---------------- */
-const shT = shStrings(typeof navigator !== 'undefined' ? (navigator.languages ?? [navigator.language]) : []);
+/** StarHermit account strings in the game's current language. */
+const shT = () => shStrings([lang()]);
 let toastTimer = null;
 function toast(text) {
     const el = $('sh-toast');
@@ -93,8 +108,8 @@ function refreshAccountButtons() {
     $('btn-invite').hidden = !platform.isHosted();
 }
 function bindAccount() {
-    $('btn-signin').textContent = shT.signIn;
-    $('btn-invite').textContent = shT.invite;
+    $('btn-signin').textContent = shT().signIn;
+    $('btn-invite').textContent = shT().invite;
     $('btn-signin').addEventListener('click', () => platform.signIn());
     $('btn-invite').addEventListener('click', () => {
         const link = platform.inviteLink();
@@ -102,7 +117,7 @@ function bindAccount() {
             return;
         // navigator.clipboard is undefined outside secure contexts: report it instead of throwing
         const clip = navigator.clipboard?.writeText ? navigator.clipboard.writeText(link) : Promise.reject(new Error('clipboard unavailable'));
-        clip.then(() => toast(shT.copied), () => toast(shT.copyFailed));
+        clip.then(() => toast(shT().copied), () => toast(shT().copyFailed));
     });
 }
 /* ---------------- profile / cloud save ---------------- */
@@ -110,27 +125,49 @@ function refreshProfileLine() {
     const nameEl = $('profile-name');
     const syncEl = $('sync-status');
     if (!platform.isHosted()) {
-        nameEl.textContent = 'Guest profile';
-        syncEl.textContent = 'progress saves on this device';
+        nameEl.textContent = T('Guest profile');
+        syncEl.textContent = T('progress saves on this device');
         return;
     }
-    nameEl.textContent = platform.nicknameNow() || 'Player';
-    syncEl.textContent = 'progress synced to your account';
+    nameEl.textContent = platform.nicknameNow() || T('Player');
+    syncEl.textContent = syncText(syncState);
+}
+let syncState = 'synced';
+function syncText(s) {
+    return s === 'saving' ? T('saving progress…')
+        : s === 'offline' ? T('sync offline — progress saves on this device')
+            : T('progress synced to your account');
 }
 function cloudDoc() {
     return { version: 1, progress, savedAt: Date.now() };
 }
+/** Merge a cloud document into local progress; true when local had something the cloud lacked. */
+function mergeCloudDoc(doc) {
+    if (doc?.version !== 1 || !doc.progress || doc.progress.version !== 1)
+        return false;
+    const merged = session.mergeProgress(progress, doc.progress);
+    const extra = JSON.stringify(merged) !== JSON.stringify(session.mergeProgress(doc.progress, doc.progress));
+    progress = merged; // localStorage stays the offline cache
+    session.saveProgress(progress);
+    return extra;
+}
 async function applyCloudSave() {
     if (!platform.isHosted())
         return;
+    // Boot: the cloud copy is merged with this device's progress (neither side wins outright).
     const doc = await platform.loadCloudSave();
-    if (doc?.version === 1 && doc.progress && doc.progress.version === 1) {
-        // remote wins on conflict; localStorage stays the offline cache
-        progress = doc.progress;
-        session.saveProgress(progress);
-    }
+    if (mergeCloudDoc(doc))
+        platform.queueCloudSave(cloudDoc());
     refreshProfileLine();
 }
+// Another device saved first: merge its progress with ours, keep the current run, save the merge.
+platform.onSaveConflict((remote) => {
+    mergeCloudDoc(remote);
+    refreshTitle();
+    if (currentScreen === 'journey')
+        buildJourneyGrid();
+    return cloudDoc();
+});
 /* ---------------- screens ---------------- */
 const SCREENS = ['title', 'modes', 'journey', 'learn', 'play', 'results', 'help'];
 function show(name) {
@@ -181,7 +218,7 @@ function startRun(mode, contentId, opts, ranked) {
     setupBoard(sess.state);
     show('play');
     fitCanvas();
-    runCountdown(() => announce('Go'));
+    runCountdown(() => announce(T('Go')));
     updateAll();
     audio.ensureAudio();
     if (sess.ranked && sess.mode === 'daily')
@@ -199,11 +236,11 @@ function updateObjective() {
     if (!sess)
         return;
     const st = sess.state;
-    const goalTxt = `Reach a ${st.goalTile} block.`;
+    const goalTxt = T('Reach a {n} block.', { n: st.goalTile });
     $('objective-text').textContent = goalTxt +
-        (st.moveLimit > 0 ? ` Moves left: ${Math.max(0, st.moveLimit - st.moves)}.` : '') +
-        (st.timeLimitMs > 0 ? ` Time limit ${Math.ceil(st.timeLimitMs / 1000)}s.` : '');
-    $('objective-progress').textContent = `Largest block: ${st.maxTile} · ${session.legal().length} legal directions`;
+        (st.moveLimit > 0 ? ' ' + T('Moves left: {n}.', { n: Math.max(0, st.moveLimit - st.moves) }) : '') +
+        (st.timeLimitMs > 0 ? ' ' + T('Time limit {n}s.', { n: Math.ceil(st.timeLimitMs / 1000) }) : '');
+    $('objective-progress').textContent = T('Largest block: {max} · {n} legal directions', { max: st.maxTile, n: session.legal().length });
     $('hud-timer-wrap').hidden = st.timeLimitMs <= 0;
 }
 function updateAll() {
@@ -267,27 +304,9 @@ function finishRun() {
     session.clearSnapshot();
     platform.queueCloudSave(cloudDoc());
     // results screen
-    $('results-headline').textContent = st.won
-        ? (sess.mode === 'learn' ? 'Lesson complete' : `Milestone reached — ${st.goalTile}!`)
-        : st.terminalReason === 'move-limit-exhausted' ? 'Out of moves'
-            : st.terminalReason === 'time-expired' ? 'Time expired'
-                : 'Matrix full — run over';
-    $('res-merge').textContent = String(st.score.mergePoints);
-    $('res-milestone').textContent = String(st.score.milestoneBonus);
-    $('res-efficiency').textContent = String(st.score.efficiencyBonus);
-    $('res-total').textContent = String(total);
-    $('res-detail').textContent = `${st.moves} moves · ${st.invalidActions} invalid attempts · largest block ${st.maxTile} · seed ${st.seed} · replay hash ${rules.stateHash(st)}`;
-    const achEl = $('res-achievements');
-    if (newAch.length > 0) {
-        achEl.hidden = false;
-        achEl.textContent = 'Achievement unlocked: ' + newAch.map((k) => content.ACHIEVEMENTS.find((a) => a.key === k)?.name ?? k).join(', ');
+    lastResult = { sess, total, prevBest, newAch };
+    if (newAch.length > 0)
         audio.sfx.achievement();
-    }
-    else
-        achEl.hidden = true;
-    const cmp = $('res-compare');
-    cmp.hidden = false;
-    cmp.textContent = total > prevBest ? 'New personal best for this board.' : `Personal best here: ${prevBest}.`;
     if (total > prevBest && newAch.length === 0)
         audio.sfx.newBest();
     $('res-board-note').hidden = true;
@@ -302,7 +321,6 @@ function finishRun() {
         nextBtn.hidden = !next;
         nextBtn.dataset.nextId = next?.id ?? '';
         nextBtn.dataset.nextKind = 'journey';
-        nextBtn.textContent = 'Next stage';
     }
     else if (sess.mode === 'learn' && st.won) {
         const idx = content.LESSONS.findIndex((l) => l.id === sess.contentId);
@@ -310,18 +328,51 @@ function finishRun() {
         nextBtn.hidden = !next;
         nextBtn.dataset.nextId = next?.id ?? '';
         nextBtn.dataset.nextKind = 'learn';
-        nextBtn.textContent = 'Next lesson';
     }
     else
         nextBtn.hidden = true;
+    renderResultsText();
     show('results');
-    announce($('results-headline').textContent + `. Total score ${total}.`);
+    announce(T('{headline}. Total score {total}.', { headline: $('results-headline').textContent ?? '', total }));
     if (st.won)
         audio.sfx.milestone();
     else
         audio.sfx.gameOver();
     if (sess.mode === 'daily')
         noteDailyResult();
+}
+/** The finished run's results text; re-rendered in place on a language change. */
+let lastResult = null;
+function renderResultsText() {
+    if (!lastResult)
+        return;
+    const { sess, total, prevBest, newAch } = lastResult;
+    const st = sess.state;
+    $('results-headline').textContent = st.won
+        ? (sess.mode === 'learn' ? T('Lesson complete') : T('Milestone reached — {n}!', { n: st.goalTile }))
+        : st.terminalReason === 'move-limit-exhausted' ? T('Out of moves')
+            : st.terminalReason === 'time-expired' ? T('Time expired')
+                : T('Matrix full — run over');
+    $('res-merge').textContent = String(st.score.mergePoints);
+    $('res-milestone').textContent = String(st.score.milestoneBonus);
+    $('res-efficiency').textContent = String(st.score.efficiencyBonus);
+    $('res-total').textContent = String(total);
+    $('res-detail').textContent = T('{moves} moves · {invalid} invalid attempts · largest block {max} · seed {seed} · replay hash {hash}', { moves: st.moves, invalid: st.invalidActions, max: st.maxTile, seed: st.seed, hash: rules.stateHash(st) });
+    const achEl = $('res-achievements');
+    if (newAch.length > 0) {
+        achEl.hidden = false;
+        achEl.textContent = T('Achievement unlocked: {names}', { names: newAch.map((k) => T(content.ACHIEVEMENTS.find((a) => a.key === k)?.name ?? k)).join(', ') });
+    }
+    else
+        achEl.hidden = true;
+    const cmp = $('res-compare');
+    cmp.hidden = false;
+    cmp.textContent = total > prevBest ? T('New personal best for this board.') : T('Personal best here: {n}.', { n: prevBest });
+    const nextBtn = $('btn-next');
+    nextBtn.textContent = nextBtn.dataset.nextKind === 'learn' ? T('Next lesson') : T('Next stage');
+    if (!$('res-board-note').hidden)
+        noteDailyResult();
+    renderLeaderboardLine();
 }
 /* ---------------- input ---------------- */
 let lastCommandId = 0;
@@ -344,7 +395,7 @@ function doMove(dir) {
     const r = session.command(dir);
     if (!r.ok) {
         if (r.reason === 'no-move') {
-            showInvalid(`Nothing slides ${dir} — try another direction.`);
+            showInvalid(T('Nothing slides {dir} — try another direction.', { dir: T(DIR_NAMES[dir]) }));
             audio.sfx.invalid();
         }
         return;
@@ -373,12 +424,13 @@ function doMove(dir) {
     if (settings.haptics && navigator.vibrate)
         navigator.vibrate(10);
     updateAll();
-    announce(`Moved ${dir}. Score ${rules.scoreTotal(sess.state)}. ${ui.boardSummary(sess.state)}`);
+    announce(T('Moved {dir}. Score {score}. {summary}', { dir: T(DIR_NAMES[dir]), score: rules.scoreTotal(sess.state), summary: ui.boardSummary(sess.state) }));
     hideInvalid();
     checkLessonProgress();
     if (r.gameOver)
         scheduleFinish(sess, 450);
 }
+const DIR_NAMES = { up: N('up'), down: N('down'), left: N('left'), right: N('right') };
 /** Let the final move land on screen before the results take over. */
 function scheduleFinish(sess, delayMs) {
     finishScheduled = true;
@@ -398,10 +450,10 @@ function doUndo() {
     if (r.ok) {
         audio.sfx.undo();
         updateAll();
-        announce('Undid the last move.');
+        announce(T('Undid the last move.'));
     }
     else {
-        showInvalid(r.reason === 'undo-unavailable' ? 'Undo is not available in this mode.' : 'Cannot undo now.');
+        showInvalid(r.reason === 'undo-unavailable' ? T('Undo is not available in this mode.') : T('Cannot undo now.'));
         audio.sfx.invalid();
     }
 }
@@ -412,7 +464,7 @@ function doHint() {
     const h = ui.computeHint(sess.state);
     const box = $('hint-box');
     box.hidden = false;
-    box.textContent = h ? `Try ${h.dir} — ${h.why}.` : 'No legal moves remain.';
+    box.textContent = h ? T('Try {dir} — {why}.', { dir: T(DIR_NAMES[h.dir]), why: h.why }) : T('No legal moves remain.');
     audio.sfx.hint();
     announce(box.textContent);
 }
@@ -571,8 +623,7 @@ function togglePause(force) {
         lastFocused = document.activeElement;
         // outside a run the same sheet is the settings dialog: run actions do not apply
         const inRun = currentScreen === 'play' && !!session.getActive();
-        $('pause-h').textContent = inRun ? 'Paused' : 'Settings';
-        $('btn-resume-play').textContent = inRun ? 'Resume' : 'Close';
+        labelPauseSheet(inRun);
         $('pause-run-actions').hidden = !inRun;
         ov.hidden = false;
         ui.refreshGraphicsPanel(settings, glActive);
@@ -585,6 +636,10 @@ function togglePause(force) {
         audio.ensureAudio();
         lastFocused?.focus?.();
     }
+}
+function labelPauseSheet(inRun) {
+    $('pause-h').textContent = inRun ? T('Paused') : T('Settings');
+    $('btn-resume-play').textContent = inRun ? T('Resume') : T('Close');
 }
 function bindLifecycle() {
     document.addEventListener('visibilitychange', () => {
@@ -611,7 +666,7 @@ function refreshTitle() {
     $('btn-resume').hidden = !snap;
     $('resume-note').hidden = !snap;
     const done = progress.journeyCompleted.length;
-    $('journey-progress').textContent = `${done}/40 stages`;
+    $('journey-progress').textContent = T('{done}/40 stages', { done });
     $('daily-date').textContent = `· ${session.utcToday()}`;
 }
 function openModeSetup(mode) {
@@ -620,14 +675,18 @@ function openModeSetup(mode) {
     setup.dataset.mode = mode;
     $('practice-opts').hidden = mode !== 'practice';
     $('challenge-opts').hidden = mode !== 'challenge';
-    const rulesText = {
-        practice: 'Unranked · undo allowed · about 5–15 minutes · solo.',
-        challenge: 'Unranked · constrained goal · undo allowed except speed · solo.',
-        score: 'Ranked · shared seed · no undo · one board per difficulty.',
-    };
-    $('mode-rules').textContent = rulesText[mode] ?? '';
-    $('ranked-note').textContent = mode === 'score' ? 'Signed in, this result is posted to the high-score leaderboard.' : 'This run does not affect competitive rating.';
+    renderModeSetupText();
     $('btn-mode-start').focus();
+}
+function renderModeSetupText() {
+    const mode = $('mode-setup').dataset.mode ?? 'practice';
+    const rulesText = {
+        practice: N('Unranked · undo allowed · about 5–15 minutes · solo.'),
+        challenge: N('Unranked · constrained goal · undo allowed except speed · solo.'),
+        score: N('Ranked · shared seed · no undo · one board per difficulty.'),
+    };
+    $('mode-rules').textContent = rulesText[mode] ? T(rulesText[mode]) : '';
+    $('ranked-note').textContent = mode === 'score' ? T('Signed in, this result is posted to the high-score leaderboard.') : T('This run does not affect competitive rating.');
 }
 function startModeFromSetup() {
     const mode = $('mode-setup').dataset.mode ?? 'practice';
@@ -666,10 +725,10 @@ function buildJourneyGrid() {
         if (s.mastery)
             b.classList.add('mastery');
         b.textContent = String(s.index + 1);
-        const bits = [`${s.name}`, `goal ${s.goalTile}`, `${s.size}×${s.size}`];
+        const bits = [stageName(s), T('goal {n}', { n: s.goalTile }), `${s.size}×${s.size}`];
         if (s.moveLimit)
-            bits.push(`${s.moveLimit} moves max`);
-        bits.push(`theme ${s.theme}`, done ? 'completed' : 'not completed');
+            bits.push(T('{n} moves max', { n: s.moveLimit }));
+        bits.push(T('theme {name}', { name: T(ui.themeById(s.theme).name) }), done ? T('completed') : T('not completed'));
         b.setAttribute('aria-label', bits.join(', '));
         b.title = bits.join(' · ');
         b.addEventListener('click', () => {
@@ -678,6 +737,9 @@ function buildJourneyGrid() {
         grid.appendChild(b);
     }
 }
+function stageName(s) {
+    return s.mastery ? T('Mastery {n}', { n: Math.floor(s.index / 8) + 1 }) : T('Stage {n}', { n: s.index + 1 });
+}
 function buildLessonList() {
     const list = $('lesson-list');
     list.textContent = '';
@@ -685,9 +747,9 @@ function buildLessonList() {
         const b = document.createElement('button');
         b.className = 'card';
         const strong = document.createElement('strong');
-        strong.textContent = `${l.index + 1}. ${l.title}`;
+        strong.textContent = `${l.index + 1}. ${T(l.title)}`;
         const span = document.createElement('span');
-        span.textContent = l.text;
+        span.textContent = T(l.text);
         b.append(strong, span);
         b.addEventListener('click', () => startLesson(l));
         list.appendChild(b);
@@ -698,8 +760,13 @@ function startLesson(l) {
     activeLesson = l;
     startRun('learn', l.id, content.lessonOptions(l), false);
     $('lesson-box').hidden = false;
-    $('lesson-title').textContent = l.title;
-    $('lesson-text').textContent = l.text;
+    renderLessonBox();
+}
+function renderLessonBox() {
+    if (!activeLesson)
+        return;
+    $('lesson-title').textContent = T(activeLesson.title);
+    $('lesson-text').textContent = T(activeLesson.text);
 }
 function checkLessonProgress() {
     if (!activeLesson)
@@ -846,7 +913,7 @@ function applyRenderMode() {
         // reuse an existing context when possible: a disposed canvas cannot be re-acquired
         glActive = render.isReady() || render.initRender(canvas, { gfx: settings.gfx, reducedMotion: settings.reducedMotion });
         if (!glActive)
-            announce('3D unavailable — using the accessible board view.');
+            announce(T('3D unavailable — using the accessible board view.'));
     }
     else if (!settings.render3d && glActive) {
         glActive = false;
@@ -885,19 +952,17 @@ async function boot() {
     // hosted mode: launch token → identity, cloud save, settings KV, bindings, leaderboard
     const info = await platform.initPlatform();
     platform.onSyncStatus((s) => {
+        syncState = s;
         if (!platform.isHosted())
             return;
-        $('sync-status').textContent =
-            s === 'saving' ? 'saving progress…'
-                : s === 'offline' ? 'sync offline — progress saves on this device'
-                    : 'progress synced to your account';
+        $('sync-status').textContent = syncText(s);
     });
     bindAccount();
     platform.onAuth((e) => {
         refreshProfileLine();
         refreshAccountButtons();
         if (!e.signedIn)
-            toast(shT.signedOut); // keep playing locally
+            toast(shT().signedOut); // keep playing locally
     });
     await applyCloudSave();
     if (info.hosted) {
@@ -933,4 +998,33 @@ async function boot() {
     refreshTitle();
     rafId = requestAnimationFrame(loop);
 }
+/* Settings → Language: lang/i18n.js re-translates the static markup and fires
+   mm-language; everything built here re-renders in place (the run continues). */
+onLanguage(() => {
+    $('btn-signin').textContent = shT().signIn;
+    $('btn-invite').textContent = shT().invite;
+    refreshProfileLine();
+    refreshTitle();
+    ui.relabelSettingsForm();
+    ui.refreshGraphicsPanel(settings, glActive);
+    if (!$('overlay-pause').hidden)
+        labelPauseSheet(currentScreen === 'play' && !!session.getActive());
+    if (!$('mode-setup').hidden)
+        renderModeSetupText();
+    if (currentScreen === 'journey')
+        buildJourneyGrid();
+    if (currentScreen === 'learn')
+        buildLessonList();
+    if (currentScreen === 'help')
+        ui.buildHelpCards($('help-cards'), keysFor);
+    if (currentScreen === 'results')
+        renderResultsText();
+    if (!$('friends-panel').hidden)
+        renderLeaderboardPanel();
+    renderLessonBox();
+    $('hint-box').hidden = true;
+    $('invalid-box').hidden = true;
+    if (session.getActive())
+        updateAll();
+});
 void boot();

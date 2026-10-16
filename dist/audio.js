@@ -1,3 +1,9 @@
+/**
+ * Merge Matrix — audio: buses, seeded variants, captions hook.
+ * Events prefer authored one-shot samples (sfx/*.opus, see sfx/manifest.json)
+ * and fall back to runtime synthesis while a sample loads or is missing.
+ */
+import { T } from './i18n.js';
 let ctx = null;
 let buses = {};
 let master = null;
@@ -14,9 +20,10 @@ export function configureAudio(s) {
 export function onCaption(cb) {
     captionCb = cb;
 }
-function caption(text) {
+/** Caption keys are English; T() shows them in the game language. */
+function caption(text, vars) {
     if (settings?.captions && captionCb)
-        captionCb(text);
+        captionCb(T(text, vars));
 }
 export function ensureAudio() {
     if (ctx) {
@@ -169,7 +176,7 @@ export const sfx = {
             tone('fx', variant(f, seed), 0.12, 'triangle', 0.22);
             tone('fx', variant(f * 1.5, seed + 7), 0.14, 'sine', 0.14, 0.03);
         }
-        caption(`merge ${value}`);
+        caption('merge {value}', { value });
     },
     invalid() {
         if (!playSample(SAMPLE_MAP.invalid))
@@ -205,7 +212,7 @@ export const sfx = {
     countdown(n) {
         if (!playSample(SAMPLE_MAP.countdown))
             tone('fx', 440 + n * 40, 0.08, 'sine', 0.14);
-        caption(`countdown ${n}`);
+        caption('countdown {n}', { n });
     },
     countdownGo() {
         if (!playSample(SAMPLE_MAP.countdownGo)) {

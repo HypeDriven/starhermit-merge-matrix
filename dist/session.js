@@ -49,6 +49,33 @@ export function loadProgress() {
 export function saveProgress(p) {
     writeJson(LS.progress, p);
 }
+/**
+ * Merge two progress records (this device's and another device's cloud save)
+ * so neither side's progress is lost: union of completed stages and daily
+ * days, the higher best score per board, the earliest unlock time per
+ * achievement, the larger games-played count, tutorial done if either is.
+ */
+export function mergeProgress(local, remote) {
+    if (!remote || remote.version !== 1)
+        return local;
+    const num = (x) => (typeof x === 'number' && Number.isFinite(x) ? x : 0);
+    const bestScores = { ...(remote.bestScores ?? {}) };
+    for (const [k, v] of Object.entries(local.bestScores ?? {}))
+        bestScores[k] = Math.max(num(v), num(bestScores[k]));
+    const achievements = { ...(remote.achievements ?? {}) };
+    for (const [k, v] of Object.entries(local.achievements ?? {})) {
+        achievements[k] = achievements[k] == null ? v : Math.min(num(v), num(achievements[k]));
+    }
+    return {
+        version: 1,
+        journeyCompleted: [...new Set([...(remote.journeyCompleted ?? []), ...(local.journeyCompleted ?? [])])].sort((a, b) => a - b),
+        bestScores,
+        achievements,
+        dailyDays: [...new Set([...(remote.dailyDays ?? []), ...(local.dailyDays ?? [])])].sort(),
+        tutorialDone: !!(local.tutorialDone || remote.tutorialDone),
+        gamesPlayed: Math.max(num(local.gamesPlayed), num(remote.gamesPlayed)),
+    };
+}
 export function unlockAchievement(p, key) {
     if (!ACHIEVEMENTS.some((a) => a.key === key))
         return false;

@@ -49,6 +49,7 @@ export interface StarHermitSDK {
   create(env?: Record<string, unknown>): StarHermitSDK;
   on(type: 'auth', fn: (e: StarHermitAuthEvent) => void): () => void;
   on(type: 'saved', fn: (ok: boolean) => void): () => void;
+  on(type: 'saveconflict', fn: (e: { etag: string | null }) => void): () => void;
   on(type: 'achievement', fn: (data: unknown) => void): () => void;
   on(type: string, fn: (value: any) => void): () => void;
   off(type: string, fn: (value: any) => void): void;
@@ -71,6 +72,8 @@ export interface StarHermitSDK {
   loadSave(): Promise<string | null>;
   writeSave(text: string, opts?: { keepalive?: boolean }): Promise<boolean>;
   loadJSON<T = unknown>(): Promise<T | null>;
+  /** True after a conditional write lost to another device's save, until the next load. */
+  saveConflicted(): boolean;
   saveJSON(obj: unknown, delayMs?: number): void;
   flushSave(keepalive?: boolean): Promise<boolean>;
 

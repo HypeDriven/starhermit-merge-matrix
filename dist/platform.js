@@ -4,11 +4,16 @@
  * starhermit-sdk.d.ts). The SDK owns the launch token + renewal, sign-in,
  * profiles, the game:<slug> cloud-save slot, the settings KV and key
  * bindings. Hosted mode = signed in. Without a token every entry point
- * no-ops and local play is unchanged.
+ * no-ops and local play is unchanged. Cloud writes after a load are
+ * conditional: when another device saved first the SDK emits 'saveconflict',
+ * and the registered merge handler reconciles the reloaded cloud document
+ * with local progress before it is saved again.
  */
+import { T } from './i18n.js';
 let sdk = null;
 let nickname = '';
 let syncCb = null;
+let mergeCb = null;
 const authCbs = [];
 function sh() {
     return sdk ?? globalThis.StarHermit ?? null;
@@ -24,6 +29,23 @@ export function onSyncStatus(cb) {
 }
 export function onAuth(cb) {
     authCbs.push(cb);
+}
+/** Register the merge for a lost conditional write: given the reloaded cloud
+ * document, return the merged document to save (or null to skip saving). */
+export function onSaveConflict(cb) {
+    mergeCb = cb;
+}
+/** Another device saved since our last load: reload, merge, save the merge. */
+export async function resolveConflict() {
+    const s = sh();
+    if (!s?.signedIn)
+        return;
+    const remote = await s.loadJSON();
+    const doc = mergeCb ? mergeCb(remote) : null;
+    if (doc != null && !s.saveConflicted()) {
+        setSync('saving');
+        s.saveJSON(doc, 0);
+    }
 }
 function setSync(s) {
     syncCb?.(s);
@@ -60,7 +82,7 @@ export async function leaderboardEntries(limit) {
     const out = [];
     for (const e of page.items.slice(0, limit)) {
         const p = e.userId ? await s.profile(String(e.userId)) : null;
-        out.push({ name: p ? p.displayName : 'Player ?', score: Number(e.score ?? 0) });
+        out.push({ name: p ? p.displayName : T('Player'), score: Number(e.score ?? 0) });
     }
     return out;
 }
@@ -156,6 +178,7 @@ export async function initPlatform(inject) {
         return { hosted: false, userId: '', nickname: '' };
     s.init();
     s.on('saved', (ok) => setSync(ok ? 'synced' : 'offline'));
+    s.on('saveconflict', () => { void resolveConflict(); });
     s.on('auth', (e) => {
         if (!e.signedIn)
             nickname = '';
@@ -173,7 +196,7 @@ export async function initPlatform(inject) {
     }
     if (s.signedIn) {
         const p = await s.profile();
-        nickname = p ? p.displayName : 'Player ' + String(s.userId).slice(0, 6);
+        nickname = p ? p.displayName : T('Player {id}', { id: String(s.userId).slice(0, 6) });
     }
     return { hosted: s.signedIn, userId: s.userId ?? '', nickname };
 }

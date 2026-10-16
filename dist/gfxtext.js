@@ -1,3 +1,4 @@
+import { lang } from './i18n.js';
 const enUS = {
     quality: 'Quality', auto: 'Auto (detected: {tier})', low: 'Low', balanced: 'Balanced', high: 'High', ultra: 'Ultra',
     renderScale: 'Render scale', fromPreset: 'From preset ({tier})', adaptive: 'Adaptive resolution', showFps: 'Show frame rate',
@@ -93,6 +94,5 @@ export function pickLocale(tag) {
     return 'en-US';
 }
 export function gfxText(tag) {
-    const nav = typeof navigator !== 'undefined' ? navigator.language : 'en-US';
-    return GFX_LOCALES[pickLocale(tag ?? nav)];
+    return GFX_LOCALES[pickLocale(tag ?? lang())];
 }

@@ -20,9 +20,11 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
+import { stubStarHermit, launchToken } from './starhermit-e2e.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const SHOT = (stage, vp) => `/tmp/merge-matrix-e2e-${stage}-${vp}.png`;
+// Screenshots go to $E2E_SHOT_DIR (default /tmp).
+const SHOT = (stage, vp) => path.join(process.env.E2E_SHOT_DIR || '/tmp', `merge-matrix-e2e-${stage}-${vp}.png`);
 
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript',
@@ -137,6 +139,72 @@ async function swipe(page, dir) {
 
 const allErrors = [];
 
+/* Signed-in language flow in its own context (stubbed StarHermit API), so the
+   standalone pass keeps its zero-/api guarantee. */
+async function languagePass(browser, vpName, viewport, hasTouch) {
+  const context = await browser.newContext({ viewport, hasTouch });
+  const page = await context.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
+  page.on('console', (m) => {
+    if ((m.type() === 'error' || m.type() === 'warning') && !browserNoise.test(m.text())) errors.push(`console ${m.type()}: ${m.text()}`);
+  });
+  try {
+    const calls = await stubStarHermit(page, { preferredLanguage: 'fr-CA' });
+    await page.goto('about:blank');
+    await page.goto(`http://127.0.0.1:${PORT}/index.html#game_token=${launchToken()}`, { waitUntil: 'load' });
+    await page.waitForFunction(() => document.documentElement.lang === 'fr-CA');
+    await page.waitForSelector('#screen-title:not([hidden])');
+    if ((await page.textContent('#btn-play')).trim() !== 'Jouer') throw new Error('title not in French');
+    // A journey run in French, then switch language mid-run.
+    await page.click('#btn-journey');
+    await page.waitForSelector('#screen-journey:not([hidden])');
+    await page.locator('#journey-grid .jcell').first().click();
+    await page.waitForSelector('#screen-play:not([hidden])');
+    await page.waitForSelector('#countdown', { state: 'hidden', timeout: 8000 });
+    if ((await page.textContent('#objective-text')).trim() !== 'Atteignez un bloc 128.') throw new Error('objective not in French');
+    await page.keyboard.press('ArrowUp');
+    const moves = await page.textContent('#hud-moves');
+    await page.click('#btn-pause');
+    await page.waitForSelector('#overlay-pause:not([hidden])');
+    const choice = page.locator('[data-game-language="choice"]');
+    await choice.scrollIntoViewIfNeeded();
+    const auto = await choice.locator('option').first().textContent();
+    if (!/^Automatique — Français \(Canada\)$/.test(auto)) throw new Error('Automatic label not resolved: ' + auto);
+    await choice.selectOption('it-IT');
+    await page.waitForFunction(() => document.documentElement.lang === 'it-IT');
+    await page.waitForFunction(() => /Salvato/.test(document.querySelector('[data-game-language="status"]').textContent));
+    if (calls.settings['ui.language']?.choice !== 'it-IT') throw new Error('ui.language not saved: ' + JSON.stringify(calls.settings));
+    if ((await page.textContent('#pause-h')).trim() !== 'In pausa') throw new Error('pause sheet not re-rendered');
+    if ((await page.textContent('#settings-graphics summary')).trim() !== 'Grafica') throw new Error('settings groups not re-rendered');
+    await page.click('#settings-graphics summary');
+    if ((await page.textContent('#gfx-quality-label')).trim() !== 'Qualità') throw new Error('graphics labels not re-rendered');
+    await page.locator('[data-game-report="title"]').scrollIntoViewIfNeeded();
+    await page.fill('[data-game-report="title"]', 'Test report');
+    await page.click('[data-game-report="send"]');
+    await page.waitForFunction(() => /Grazie/.test(document.querySelector('[data-game-report="status"]').textContent));
+    if (!calls.reports?.[0] || calls.reports[0].kind !== 'bug') throw new Error('report not posted');
+    await page.screenshot({ path: SHOT('language', vpName) });
+    await page.locator('#btn-resume-play').scrollIntoViewIfNeeded();
+    await page.click('#btn-resume-play');
+    await page.waitForSelector('#overlay-pause', { state: 'hidden' });
+    // The run continued in place: same move count, Italian HUD and objective.
+    if ((await page.textContent('#hud-moves')) !== moves) throw new Error('run restarted on language change');
+    if ((await page.textContent('#hud-moves-label')).trim() !== 'Mosse') throw new Error('HUD not re-rendered');
+    if ((await page.textContent('#objective-text')).trim() !== 'Raggiungi un blocco da 128.') throw new Error('objective not re-rendered');
+    await page.screenshot({ path: SHOT('language-hud', vpName) });
+    // Back to Automatic → fr-CA.
+    await page.click('#btn-pause');
+    await choice.scrollIntoViewIfNeeded();
+    await choice.selectOption('auto');
+    await page.waitForFunction(() => document.documentElement.lang === 'fr-CA');
+    if (calls.settings['ui.language']?.choice !== 'auto') throw new Error('ui.language auto not saved');
+  } finally {
+    await context.close();
+  }
+  if (errors.length) throw new Error('language pass page errors:\n' + errors.join('\n'));
+}
+
 async function runPass(browser, vpName, viewport, hasTouch) {
   const context = await browser.newContext({ viewport, hasTouch });
   const page = await context.newPage();
@@ -207,6 +275,10 @@ async function runPass(browser, vpName, viewport, hasTouch) {
       if (await page.inputValue('#set-gfx-bloom') !== 'preset') throw new Error('preset did not clear overrides');
       await page.click('#btn-resume-play');
       await page.waitForSelector('#overlay-pause', { state: 'hidden' });
+    });
+
+    await step('Language: Automatic follows the StarHermit preferred language; switching mid-run re-renders; ui.language; report a problem', async () => {
+      await languagePass(browser, vpName, viewport, hasTouch);
     });
 
     await step('help screen opens and closes', async () => {

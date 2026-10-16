@@ -16,7 +16,7 @@ function loadSdk(): StarHermitSDK {
 const USER = 'a1b2c3d4-0000-4000-8000-000000000001';
 const SLUG = 'merge-matrix';
 
-interface Call { url: string; method: string; body?: any; auth?: string }
+interface Call { url: string; method: string; body?: any; auth?: string; ifMatch?: string }
 
 function fixture(href: string) {
   const b64url = (o: object) => Buffer.from(JSON.stringify(o)).toString('base64url');
@@ -28,6 +28,7 @@ function fixture(href: string) {
   };
   const calls: Call[] = [];
   let slot: Uint8Array | null = null;
+  let version = 0; // the slot's ETag is "v<version>"; writes are conditional on it
   const kv: Record<string, unknown> = { theme: 'neon' };
   const res = (status: number, body?: unknown, bytes?: Uint8Array) => ({
     ok: status >= 200 && status < 300, status,
@@ -37,10 +38,21 @@ function fixture(href: string) {
   const fetch = async (url: string, init: any = {}) => {
     const method = init.method || 'GET';
     const body = init.body ? JSON.parse(init.body) : undefined;
-    calls.push({ url, method, body, auth: (init.headers || {}).Authorization });
+    const headers = init.headers || {};
+    calls.push({ url, method, body, auth: headers.Authorization, ifMatch: headers['If-Match'] });
     if (url === `/api/v1/users/${USER}/profile`) return res(200, { nickname: 'Tile Tamer', username: 'hidden' });
+    if (url === `/api/v1/me/cloud-saves/${encodeURIComponent('game:' + SLUG)}/info`) {
+      return res(200, slot ? { exists: true, etag: `"v${version}"` } : { exists: false });
+    }
     if (url === `/api/v1/me/cloud-saves/${encodeURIComponent('game:' + SLUG)}`) {
-      if (method === 'PUT') { slot = new Uint8Array(Buffer.from(body.dataBase64, 'base64')); return res(204); }
+      if (method === 'PUT') {
+        const cur = slot ? `"v${version}"` : null;
+        if (headers['If-Match'] && headers['If-Match'] !== cur) return res(412, { error: 'precondition failed', etag: cur });
+        if (headers['If-None-Match'] === '*' && slot) return res(412, { error: 'precondition failed', etag: cur });
+        slot = new Uint8Array(Buffer.from(body.dataBase64, 'base64'));
+        version++;
+        return res(200, { etag: `"v${version}"` });
+      }
       return slot ? res(200, null, slot) : res(404);
     }
     if (url === `/api/v1/games/${SLUG}/settings`) {
@@ -53,7 +65,25 @@ function fixture(href: string) {
   };
   const setTimeout = (fn: () => void, ms: number) => { const t = globalThis.setTimeout(fn, ms); t.unref(); return t; };
   const sh = loadSdk().create({ window: win, fetch, setTimeout, clearTimeout });
-  return { sh, win, calls, kv };
+  // Another device writes the slot (bumps the version behind this client's back).
+  const writeElsewhere = (doc: unknown) => { slot = new Uint8Array(zipStored(JSON.stringify(doc))); version++; };
+  return { sh, win, calls, kv, writeElsewhere };
+}
+
+/** A minimal stored (uncompressed) zip with one save.json entry, as the platform serves it. */
+function zipStored(text: string): Buffer {
+  const data = Buffer.from(text, 'utf8');
+  const name = Buffer.from('save.json');
+  let c = ~0;
+  for (const b of data) { c ^= b; for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xEDB88320 & -(c & 1)); }
+  const crc = (~c) >>> 0;
+  const local = Buffer.alloc(30); local.writeUInt32LE(0x04034b50, 0); local.writeUInt16LE(20, 4);
+  local.writeUInt32LE(crc, 14); local.writeUInt32LE(data.length, 18); local.writeUInt32LE(data.length, 22); local.writeUInt16LE(name.length, 26);
+  const central = Buffer.alloc(46); central.writeUInt32LE(0x02014b50, 0); central.writeUInt16LE(20, 4); central.writeUInt16LE(20, 6);
+  central.writeUInt32LE(crc, 16); central.writeUInt32LE(data.length, 20); central.writeUInt32LE(data.length, 24); central.writeUInt16LE(name.length, 28);
+  const end = Buffer.alloc(22); end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(1, 8); end.writeUInt16LE(1, 10);
+  end.writeUInt32LE(central.length + name.length, 12); end.writeUInt32LE(local.length + name.length + data.length, 16);
+  return Buffer.concat([local, name, data, central, name, end]);
 }
 
 let platform: typeof import('../src/platform');
@@ -122,9 +152,38 @@ describe('StarHermit adapter', () => {
   });
 
   it('offers sign-in on the platform host without a token', async () => {
-    const f = fixture('https://merge-matrix.starhermit.com/');
+    const f = fixture('https://0b9d6f2e-3c4a-4e5b-9a7c-1d2e3f405162.starhermit.com/');
     await platform.initPlatform(f.sh);
     expect(platform.canSignIn()).toBe(true);
     expect(f.calls).toHaveLength(0);
+  });
+
+  it('on a save conflict reloads the cloud copy, merges it and saves the merge', async () => {
+    const session = await import('../src/session');
+    const f = fixture('https://x.example/#game_token={jwt}');
+    await platform.initPlatform(f.sh);
+    expect(await platform.loadCloudSave()).toBeNull(); // empty slot: next write is If-None-Match: *
+    const mine: import('../src/session').Progress = { version: 1, journeyCompleted: [0, 1], bestScores: { j01: 300 }, achievements: { 'first-clear': 50 }, dailyDays: ['2026-10-15'], tutorialDone: true, gamesPlayed: 5 };
+    platform.queueCloudSave({ version: 1, progress: mine });
+    await f.sh.flushSave();
+    // Another device saves first; our next write is refused (412) and the merge handler runs.
+    f.writeElsewhere({ version: 1, progress: { version: 1, journeyCompleted: [0, 2], bestScores: { j01: 200, j03: 900 }, achievements: { 'first-clear': 10, 'tile-4096': 20 }, dailyDays: ['2026-10-16'], tutorialDone: false, gamesPlayed: 9 } });
+    let merged: import('../src/session').Progress | null = null;
+    platform.onSaveConflict((remote) => {
+      merged = session.mergeProgress(mine, (remote as { progress: import('../src/session').Progress }).progress);
+      return { version: 1, progress: merged };
+    });
+    const states: string[] = [];
+    platform.onSyncStatus((s) => states.push(s));
+    platform.queueCloudSave({ version: 1, progress: mine });
+    await f.sh.flushSave();
+    await new Promise((r) => setTimeout(r, 30));
+    await f.sh.flushSave();
+    expect(merged).toEqual({ version: 1, journeyCompleted: [0, 1, 2], bestScores: { j01: 300, j03: 900 }, achievements: { 'first-clear': 10, 'tile-4096': 20 }, dailyDays: ['2026-10-15', '2026-10-16'], tutorialDone: true, gamesPlayed: 9 });
+    const puts = f.calls.filter((c) => c.method === 'PUT');
+    expect(puts.at(-1)!.ifMatch).toBe('"v2"');
+    expect(f.sh.saveConflicted()).toBe(false);
+    expect(states.at(-1)).toBe('synced');
+    expect(await platform.loadCloudSave()).toEqual({ version: 1, progress: merged });
   });
 });
