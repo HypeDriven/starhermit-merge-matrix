@@ -1,6 +1,6 @@
 /**
- * Merge Matrix — graphics quality model: presets, per-category overrides, GPU
- * detection and a cost summary. Pure (no three.js, no DOM) so the settings
+ * Merge Matrix — graphics quality model: presets, per-category overrides, StarHermit
+ * hardware-level detection, per-preset budgets and a cost summary. Pure (no three.js, no DOM) so the settings
  * panel, the renderer and the unit tests agree on what a setting means.
  */
 
@@ -32,7 +32,6 @@ const TABLE: Record<Preset, Row> = {
 };
 
 export const SHADOW_MAP: Record<string, number> = { off: 0, low: 1024, medium: 2048, high: 4096 };
-export const PARTICLE_COUNT: Record<string, number> = { off: 0, low: 70, high: 220 };
 
 /** Saved form: `preset` is 'auto' or a preset; a category is 'preset' or a tier. */
 export interface GfxSaved {
@@ -51,22 +50,83 @@ export type Resolved = { [K in Category]: (typeof CATEGORIES)[K][number] } & {
   adaptive: boolean;
   showFps: boolean;
   post: boolean;
+  level: number;
+  budget: Budget;
 };
 
 export const DEFAULT_GFX: GfxSaved = { preset: 'auto', render_scale: 1, adaptive: true, show_fps: false };
 
+/** Shared StarHermit hardware-level module (gpu-level.js, a classic script loaded before the game). */
+interface GpuApi {
+  detectLevel(system: Record<string, unknown>): number;
+  presetForLevel(level: number, levels?: Record<string, number>): string;
+  scaleBudget(base: number, level: number, presetMin?: number): number;
+}
+const gpuApi = (): GpuApi | undefined => (globalThis as { StarHermitGpu?: GpuApi }).StarHermitGpu;
+
 /**
- * Best preset for this GPU, from the unmasked renderer string when exposed.
- * Software renderers get Low; discrete GPUs and Apple M get High; the rest
- * Balanced. Touch/mobile devices are capped at Balanced.
+ * Auto picks the preset from the StarHermit hardware level (0 = Galaxy S20 / Intel UHD or weaker, 20 = RTX
+ * 5090): Low from 0, Balanced from 4, High from 10, Ultra from 17. Phones, tablets and ≤ 4 GB machines are
+ * capped at level 9 (Balanced); software renderers and no WebGL are level 0.
  */
-export function detectPreset(gpu: string | null | undefined, touch = false): Preset {
-  const g = String(gpu || '').toLowerCase();
-  let p: Preset = 'balanced';
-  if (/swiftshader|llvmpipe|softpipe|software|basic render|microsoft basic/.test(g)) p = 'low';
-  else if (/nvidia|geforce|rtx|gtx|quadro|radeon rx|radeon pro|amd radeon(?!.*graphics)|apple m\d/.test(g)) p = 'high';
-  if (touch && p === 'high') p = 'balanced';
-  return p;
+export const LEVELS: Record<Preset, number> = { low: 0, balanced: 4, high: 10, ultra: 17 };
+
+/** Hardware level 0–20 for an unmasked renderer string plus StarHermitGpu.detectSystem() facts. */
+export function detectLevel(gpu: string | null | undefined, system?: Record<string, unknown>): number {
+  const G = gpuApi();
+  const sys: Record<string, unknown> = { webgl: true, webgl2: true, ...(system || {}), gpu: String(gpu || '') };
+  if (!gpu) sys.webgl = false;
+  return G ? G.detectLevel(sys) : gpu ? LEVELS.balanced : 0;
+}
+
+/** The preset Auto starts from for a hardware level. */
+export function presetForLevel(level: number): Preset {
+  const G = gpuApi();
+  if (G) return G.presetForLevel(level, LEVELS) as Preset;
+  return PRESETS.filter((p) => LEVELS[p] <= level).pop() ?? 'low';
+}
+
+/** Best preset for this GPU (the hardware level already caps phones/tablets at Balanced). */
+export function detectPreset(gpu: string | null | undefined, system?: Record<string, unknown>): Preset {
+  return presetForLevel(detectLevel(gpu, system));
+}
+
+/**
+ * Per-preset asset and effect budget. Each preset holds 60 FPS on the weakest GPU Auto gives it (Low →
+ * level 0, Balanced → 4, High → 10, Ultra → 17; measured with tests/gfx-bench.mjs). The board, tiles and
+ * rules are identical on every preset — only visuals change.
+ *   material   tile/board shading: lambert (Low) / standard (Balanced) / physical (High, Ultra: clear coat)
+ *   label      tile-number canvas texture size in px (grid trace texture: the same)
+ *   bevel      rounded-box segments for tiles and cells (Tile detail: detailed)
+ *   ambient    drifting ambient particles at Particles "high" (low: a third), scaled with the level
+ *   bloomRes / aoRes  bloom and GTAO resolution as a fraction of the frame
+ */
+export interface Budget {
+  material: 'lambert' | 'standard' | 'physical';
+  label: number; bevel: number; ambient: number; bloomRes: number; aoRes: number;
+}
+export const BUDGETS: Record<Preset, Budget> = {
+  low: { material: 'lambert', label: 128, bevel: 2, ambient: 90, bloomRes: 0.5, aoRes: 0.5 },
+  balanced: { material: 'standard', label: 256, bevel: 2, ambient: 150, bloomRes: 0.5, aoRes: 0.5 },
+  high: { material: 'physical', label: 256, bevel: 4, ambient: 220, bloomRes: 0.5, aoRes: 0.5 },
+  ultra: { material: 'physical', label: 512, bevel: 6, ambient: 320, bloomRes: 1, aoRes: 1 },
+};
+export const AMBIENT_MAX = 640;
+const PARTICLE_SHARE: Record<string, number> = { off: 0, low: 1 / 3, high: 1 };
+
+/** A preset's concrete budget for a hardware level (the particle count scales ≤ 2× within the preset). */
+export function budgetFor(preset: Preset, level?: number): Budget {
+  const b = { ...(BUDGETS[preset] ?? BUDGETS.balanced) };
+  const G = gpuApi(), floor = LEVELS[preset] ?? 0;
+  const lv = Math.max(Number.isFinite(level) ? (level as number) : floor, floor);
+  const k = G ? Math.min(2, G.scaleBudget(1, lv, floor)) : 1;
+  b.ambient = Math.min(AMBIENT_MAX, Math.round(b.ambient * k));
+  return b;
+}
+
+/** Ambient particles drawn for a resolved setting (Particles tier share of the preset's budget). */
+export function particleCount(r: Resolved): number {
+  return Math.round(r.budget.ambient * (PARTICLE_SHARE[r.particles] ?? 0));
 }
 
 function isPreset(v: unknown): v is Preset {
@@ -78,7 +138,7 @@ export function clamp(v: number, a: number, b: number): number {
 }
 
 /** Resolve saved settings into concrete tiers. */
-export function resolve(saved: GfxSaved | null | undefined, detected: Preset | null | undefined): Resolved {
+export function resolve(saved: GfxSaved | null | undefined, detected: Preset | null | undefined, level?: number): Resolved {
   const s = saved || {};
   const preset: Preset = isPreset(s.preset) ? s.preset : isPreset(detected) ? detected : 'balanced';
   const row = TABLE[preset];
@@ -89,7 +149,9 @@ export function resolve(saved: GfxSaved | null | undefined, detected: Preset | n
     pixelCap: row.pixelCap,
     adaptive: s.adaptive !== false,
     showFps: !!s.show_fps,
+    level: Number.isFinite(level) ? (level as number) : LEVELS[preset],
   } as Resolved;
+  out.budget = budgetFor(preset, out.level);
   for (const cat of CATEGORY_KEYS) {
     const tiers = CATEGORIES[cat] as readonly string[];
     (out as Record<string, unknown>)[cat] = tiers.includes(s[cat] as string) ? s[cat] : row[cat];

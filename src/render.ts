@@ -21,7 +21,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import type { ThemeDef } from './content.js';
 import {
-  resolve, describe, detectPreset, adaptStep, SHADOW_MAP, PARTICLE_COUNT,
+  resolve, describe, detectLevel, presetForLevel, particleCount, adaptStep, SHADOW_MAP,
   type GfxSaved, type Resolved, type Preset, type DescribeWords,
 } from './gfx.js';
 
@@ -64,6 +64,7 @@ const geoCache = new Map<string, THREE.BufferGeometry>();
 // graphics state
 let gpu = '';
 let detected: Preset = 'balanced';
+let gpuLevel = 4;
 let q: Resolved = resolve({}, 'balanced');
 let gfxJson = '';
 let cssSize: [number, number] = [1, 1];
@@ -95,9 +96,23 @@ function readGpu(gl: WebGLRenderingContext | WebGL2RenderingContext): string {
   } catch { return ''; }
 }
 
-/** GPU name and Auto preset, probing a throwaway context if the board renderer is not up yet. */
-export function probeGpu(): { gpu: string; detected: Preset } {
-  if (renderer) return { gpu, detected };
+/** Hardware level (gpu-level.js) from the renderer string plus device facts (phone/tablet, cores, memory). */
+function detectFromGpu(webgl2: boolean): void {
+  let sys: Record<string, unknown> = { mobile: isTouchDevice(), webgl2 };
+  try {
+    const G = (globalThis as { StarHermitGpu?: { detectSystem(): Record<string, unknown> } }).StarHermitGpu;
+    if (G) {
+      const d = G.detectSystem();
+      sys = { ...sys, mobile: !!sys.mobile || !!d.mobile, touch: d.touch, screen: d.screen, cores: d.cores, memoryGb: d.memoryGb, astc: d.astc };
+    }
+  } catch { /* defaults */ }
+  gpuLevel = detectLevel(gpu, sys);
+  detected = presetForLevel(gpuLevel);
+}
+
+/** GPU name, hardware level and Auto preset, probing a throwaway context if the board renderer is not up yet. */
+export function probeGpu(): { gpu: string; detected: Preset; level: number } {
+  if (renderer) return { gpu, detected, level: gpuLevel };
   if (!gpu) {
     try {
       const c = document.createElement('canvas');
@@ -107,9 +122,9 @@ export function probeGpu(): { gpu: string; detected: Preset } {
         gl.getExtension('WEBGL_lose_context')?.loseContext();
       }
     } catch { /* no WebGL */ }
-    detected = detectPreset(gpu, isTouchDevice());
+    detectFromGpu(true);
   }
-  return { gpu, detected };
+  return { gpu, detected, level: gpuLevel };
 }
 
 /* ---------------- materials & textures ---------------- */
@@ -137,35 +152,57 @@ function glowFor(v: number): number {
 function detailed(): boolean { return q.detail === 'detailed'; }
 
 function tileGeometry(): THREE.BufferGeometry {
-  const k = `tile:${q.detail}`;
+  const k = `tile:${q.detail}:${q.budget.bevel}`;
   let g = geoCache.get(k);
   if (!g) {
-    g = detailed() ? new RoundedBoxGeometry(0.86, 0.3, 0.86, 4, 0.085) : new THREE.BoxGeometry(0.86, 0.3, 0.86);
+    g = detailed() ? new RoundedBoxGeometry(0.86, 0.3, 0.86, q.budget.bevel, 0.085) : new THREE.BoxGeometry(0.86, 0.3, 0.86);
     geoCache.set(k, g);
   }
   return g;
 }
 
 /** Box faces in geometry order: only the top face carries the number. */
+/**
+ * Shading model per the preset's budget: Lambert on Low, Standard on Balanced, the authored Physical
+ * (clear coat) on High/Ultra. Lambert keeps colour, maps and emission; it drops the PBR-only parameters.
+ */
+type MatParams = THREE.MeshPhysicalMaterialParameters;
+function litMaterial(p: MatParams): THREE.Material {
+  const tier = q.budget.material;
+  if (tier === 'lambert') {
+    const l: THREE.MeshLambertMaterialParameters = {};
+    for (const k of ['color', 'map', 'emissive', 'emissiveIntensity', 'emissiveMap'] as const) {
+      if (p[k] !== undefined) (l as Record<string, unknown>)[k] = p[k];
+    }
+    return new THREE.MeshLambertMaterial(l);
+  }
+  if (tier === 'standard') {
+    const { clearcoat, clearcoatRoughness, ...rest } = p;
+    void clearcoat; void clearcoatRoughness;
+    return new THREE.MeshStandardMaterial(rest);
+  }
+  return p.clearcoat !== undefined ? new THREE.MeshPhysicalMaterial(p) : new THREE.MeshStandardMaterial(p);
+}
+
 function tileMaterials(v: number): THREE.Material[] {
-  const k = `${theme?.id}:${q.detail}:${v}`;
+  const k = `${theme?.id}:${q.detail}:${q.budget.material}:${q.budget.label}:${v}`;
   const hit = tileMatCache.get(k);
   if (hit) return hit;
   const col = new THREE.Color(tileColor(v));
   let mats: THREE.Material[];
   if (detailed()) {
-    const side = new THREE.MeshPhysicalMaterial({
+    const side = litMaterial({
       color: col, roughness: 0.4, metalness: 0.05, clearcoat: 0.8, clearcoatRoughness: 0.18,
       emissive: col, emissiveIntensity: 0.12 + glowFor(v), envMapIntensity: 0.45,
     });
-    const top = new THREE.MeshPhysicalMaterial({
+    const top = litMaterial({
       map: labelTexture(v), roughness: 0.5, metalness: 0.0, clearcoat: 0.25, clearcoatRoughness: 0.3,
       emissive: col, emissiveIntensity: 0.06, envMapIntensity: 0.15,
     });
     mats = [side, side, top, side, side, side];
   } else {
-    const side = new THREE.MeshStandardMaterial({ color: col, roughness: 0.35, metalness: 0.25, emissive: col, emissiveIntensity: 0.25 });
-    const top = new THREE.MeshStandardMaterial({ map: labelTexture(v), roughness: 0.35, metalness: 0.25, emissive: col, emissiveIntensity: 0.25 });
+    const side = litMaterial({ color: col, roughness: 0.35, metalness: 0.25, emissive: col, emissiveIntensity: 0.25 });
+    const top = litMaterial({ map: labelTexture(v), roughness: 0.35, metalness: 0.25, emissive: col, emissiveIntensity: 0.25 });
     mats = [side, side, top, side, side, side];
   }
   tileMatCache.set(k, mats);
@@ -173,12 +210,14 @@ function tileMaterials(v: number): THREE.Material[] {
 }
 
 function labelTexture(v: number): THREE.Texture {
-  const k = `label:${theme?.id}:${q.detail}:${v}`;
+  const n = q.budget.label; // authored at 256 px, drawn scaled into the preset's texture budget
+  const k = `label:${theme?.id}:${q.detail}:${n}:${v}`;
   const hit = texCache.get(k);
   if (hit) return hit;
   const c = document.createElement('canvas');
-  c.width = c.height = 256;
+  c.width = c.height = n;
   const g = c.getContext('2d')!;
+  g.scale(n / 256, n / 256);
   const col = tileColor(v);
   const light = !!theme && !theme.textLight;
   g.fillStyle = col; // full bleed: no dark corners on the rounded top
@@ -252,12 +291,14 @@ function noiseTexture(): THREE.Texture {
 
 /** Faint circuit-grid trace for the ground (emissive map, fades into the fog). */
 function gridTexture(): THREE.Texture {
-  const k = `grid:${theme?.id}`;
+  const n = q.budget.label;
+  const k = `grid:${theme?.id}:${n}`;
   const hit = texCache.get(k);
   if (hit) return hit;
   const c = document.createElement('canvas');
-  c.width = c.height = 256;
+  c.width = c.height = n;
   const g = c.getContext('2d')!;
+  g.scale(n / 256, n / 256);
   g.fillStyle = '#000';
   g.fillRect(0, 0, 256, 256);
   g.strokeStyle = theme?.accent ?? '#41d9c0';
@@ -319,7 +360,7 @@ export function initRender(canvas: HTMLCanvasElement, settings: RenderSettings):
     return false;
   }
   gpu = readGpu(renderer.getContext());
-  detected = detectPreset(gpu, isTouchDevice());
+  detectFromGpu(renderer.capabilities.isWebGL2);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
@@ -442,10 +483,11 @@ export function buildBoard(newSize: number): void {
   tiles = Array.from({ length: size }, () => new Array<TileView | null>(size).fill(null));
   const det = detailed();
 
-  const cellGeo = det ? new RoundedBoxGeometry(0.96, 0.12, 0.96, 3, 0.07) : new THREE.BoxGeometry(0.96, 0.12, 0.96);
+  const bevel = Math.max(1, q.budget.bevel - 1);
+  const cellGeo = det ? new RoundedBoxGeometry(0.96, 0.12, 0.96, bevel, 0.07) : new THREE.BoxGeometry(0.96, 0.12, 0.96);
   const cellMat = det
-    ? new THREE.MeshPhysicalMaterial({ color: new THREE.Color(theme.cell), roughness: 0.55, metalness: 0.35, roughnessMap: noiseTexture(), clearcoat: 0.3, clearcoatRoughness: 0.4, envMapIntensity: 0.3 })
-    : new THREE.MeshStandardMaterial({ color: new THREE.Color(theme.cell), roughness: 0.6, metalness: 0.3 });
+    ? litMaterial({ color: new THREE.Color(theme.cell), roughness: 0.55, metalness: 0.35, roughnessMap: noiseTexture(), clearcoat: 0.3, clearcoatRoughness: 0.4, envMapIntensity: 0.3 })
+    : litMaterial({ color: new THREE.Color(theme.cell), roughness: 0.6, metalness: 0.3 });
   const cells = new THREE.InstancedMesh(cellGeo, cellMat, size * size);
   const m4 = new THREE.Matrix4();
   for (let r = 0; r < size; r++) {
@@ -460,12 +502,12 @@ export function buildBoard(newSize: number): void {
   boardMeshes.push(cells);
 
   // grid base slab
-  const slabGeo = det ? new RoundedBoxGeometry(size + 0.24, 0.1, size + 0.24, 3, 0.05) : new THREE.BoxGeometry(size + 0.24, 0.1, size + 0.24);
+  const slabGeo = det ? new RoundedBoxGeometry(size + 0.24, 0.1, size + 0.24, bevel, 0.05) : new THREE.BoxGeometry(size + 0.24, 0.1, size + 0.24);
   const slab = new THREE.Mesh(
     slabGeo,
     det
-      ? new THREE.MeshPhysicalMaterial({ color: new THREE.Color(theme.grid), roughness: 0.3, metalness: 0.6, roughnessMap: noiseTexture(), clearcoat: 0.6, clearcoatRoughness: 0.2, envMapIntensity: 0.5 })
-      : new THREE.MeshStandardMaterial({ color: new THREE.Color(theme.grid), roughness: 0.4, metalness: 0.5 }),
+      ? litMaterial({ color: new THREE.Color(theme.grid), roughness: 0.3, metalness: 0.6, roughnessMap: noiseTexture(), clearcoat: 0.6, clearcoatRoughness: 0.2, envMapIntensity: 0.5 })
+      : litMaterial({ color: new THREE.Color(theme.grid), roughness: 0.4, metalness: 0.5 }),
   );
   slab.position.y = -0.2;
   slab.receiveShadow = true;
@@ -583,7 +625,7 @@ function buildParticles(): void {
     particles = null;
     particleVel = null;
   }
-  const n = PARTICLE_COUNT[q.particles] ?? 0;
+  const n = particleCount(q);
   if (n <= 0) return;
   const pos = new Float32Array(n * 3);
   particleVel = new Float32Array(n);
@@ -628,8 +670,8 @@ export function setGraphics(saved: GfxSaved, force = false): void {
   const json = JSON.stringify(saved ?? {});
   if (!force && json === gfxJson) return;
   gfxJson = json;
-  const prevDetail = q.detail;
-  q = resolve(saved, detected);
+  const prevDetail = q.detail, prevBudget = q.budget;
+  q = resolve(saved, detected, gpuLevel);
   if (!renderer || !scene) return;
   const mapSize = SHADOW_MAP[q.shadows];
   renderer.shadowMap.enabled = mapSize > 0;
@@ -644,9 +686,9 @@ export function setGraphics(saved: GfxSaved, force = false): void {
   scene.environment = q.reflections === 'on' ? envTex : null;
   scene.environmentIntensity = 0.4;
   if (hemi) hemi.intensity = q.reflections === 'on' ? 0.45 : 0.7;
-  if (force || prevDetail !== q.detail) {
+  if (force || prevDetail !== q.detail || prevBudget.material !== q.budget.material || prevBudget.label !== q.budget.label) {
     clearTileMaterials();
-    for (const [k, tex] of texCache) if (k.startsWith('label:')) { tex.dispose(); texCache.delete(k); }
+    for (const [k, tex] of texCache) if (k.startsWith('label:') || k.startsWith('grid:')) { tex.dispose(); texCache.delete(k); }
   }
   applyThemeLights();
   if (theme) {
@@ -671,6 +713,7 @@ export function setGraphics(saved: GfxSaved, force = false): void {
 
 export interface GraphicsInfo {
   gpu: string;
+  level: number;
   detected: Preset;
   resolved: Resolved;
   pixels: [number, number];
@@ -685,7 +728,7 @@ export function graphicsInfo(): GraphicsInfo {
   const px: [number, number] = [Math.round(cssSize[0] * pixelRatio), Math.round(cssSize[1] * pixelRatio)];
   const resolved = q;
   return {
-    gpu, detected, resolved, pixels: px, fps: Math.round(fps), adaptiveScale, postFailed,
+    gpu, level: gpuLevel, detected, resolved, pixels: px, fps: Math.round(fps), adaptiveScale, postFailed,
     summary: (words) => describe(resolved, px, words),
   };
 }
@@ -729,6 +772,17 @@ function currentPostKey(): string {
   return q.post ? [q.ao, q.bloom, q.grade, q.antialias, cssSize[0], cssSize[1], pixelRatio].join('|') : 'none';
 }
 
+/**
+ * Run a post pass at a fraction of the frame: EffectComposer.addPass/setSize hand every pass the full
+ * frame size, so the pass's own setSize applies the budget's scale (half-res bloom/GTAO below Ultra).
+ */
+function atScale<P extends { setSize(w: number, h: number): void }>(pass: P, k: number): P {
+  if (!(k < 1)) return pass;
+  const setSize = pass.setSize.bind(pass);
+  pass.setSize = (w: number, h: number) => setSize(Math.max(1, Math.round(w * k)), Math.max(1, Math.round(h * k)));
+  return pass;
+}
+
 function buildPost(): void {
   composer?.dispose();
   composer = null;
@@ -748,12 +802,12 @@ function buildPost(): void {
       ao.blendIntensity = 0.75;
       ao.updateGtaoMaterial({ radius: 0.45, distanceExponent: 1.4, thickness: 1.0, scale: 1.0, samples: q.ao === 'high' ? 16 : 8 });
       ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: q.ao === 'high' ? 6 : 4, rings: 2, samples: q.ao === 'high' ? 16 : 8 });
-      c.addPass(ao);
+      c.addPass(atScale(ao, q.budget.aoRes));
     }
     if (q.bloom === 'on') {
       // HDR threshold above lit-surface levels: only the light-trace frame, the
       // emissive sides of 128+ tiles and hot specular glints bloom
-      c.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), 0.4, 0.3, 2.0));
+      c.addPass(atScale(new UnrealBloomPass(new THREE.Vector2(w, h), 0.4, 0.3, 2.0), q.budget.bloomRes));
     }
     if (q.grade === 'on') c.addPass(new ShaderPass(GradeShader));
     c.addPass(new OutputPass());

@@ -200,8 +200,8 @@ function bindGraphicsForm(s, emit) {
 /** Sync the Graphics controls, labels and body attributes with the current settings. */
 export function refreshGraphicsPanel(s, glActive) {
     const t = gfxText();
-    const { detected } = render.probeGpu();
-    const r = resolve(s.gfx, detected);
+    const { detected, level } = render.probeGpu();
+    const r = resolve(s.gfx, detected, level);
     document.body.dataset.gfxPreset = r.preset;
     document.body.dataset.gfxDetail = r.detail;
     document.body.dataset.gfxAuto = String(r.auto);
@@ -229,7 +229,7 @@ export function refreshGraphicsPanel(s, glActive) {
     off.hidden = glActive;
     refreshGraphicsSummary(glActive);
 }
-/** The live line: GPU · cost summary · drawing-buffer size, plus the post-processing note. */
+/** The live line: GPU · hardware level · cost summary · drawing-buffer size, plus the post-processing note. */
 export function refreshGraphicsSummary(glActive) {
     const t = gfxText();
     const note = gid('gfx-post-note');
@@ -240,7 +240,7 @@ export function refreshGraphicsSummary(glActive) {
         return;
     }
     const info = render.graphicsInfo();
-    gid('gfx-summary').textContent = `${info.gpu || t.unknownGpu} · ${info.summary(t)}`;
+    gid('gfx-summary').textContent = `${info.gpu || t.unknownGpu} · ${t.level.replace('{n}', String(info.level))} · ${info.summary(t)}`;
     note.textContent = t.postFailed;
     note.hidden = !info.postFailed;
 }

@@ -254,6 +254,7 @@ async function runPass(browser, vpName, viewport, hasTouch) {
       await presetIs('high');
       let summary = await page.textContent('#gfx-summary');
       if (!/SMAA/.test(summary) || !/bloom/.test(summary)) throw new Error(`High summary: ${summary}`);
+      if (!/ · Level 0 · /.test(summary)) throw new Error(`summary lacks the hardware level: ${summary}`);
       const fromPreset = await page.locator('#set-gfx-shadows option[value="preset"]').textContent();
       if (fromPreset !== 'From preset (Medium)') throw new Error(`shadows preset label: ${fromPreset}`);
       await page.selectOption('#set-gfx-bloom', 'off');

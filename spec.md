@@ -32,7 +32,8 @@ grid can hold — with a seeded board that anyone can replay move for move.
 | `src/main.ts` | Boot, screen state machine, input routing (keys/pointer/gamepad), results (no own-server calls) |
 | `src/ui.ts` | DOM board build/render, ARIA labels, settings form binding, help cards, hint text |
 | `src/render.ts` | Three.js scene: tile meshes, label textures, camera framing, merge pulse, glow/shake, lights/shadows/IBL, particles, post chain, adaptive resolution, `setGraphics()`/`graphicsInfo()` |
-| `src/gfx.ts` | Pure graphics quality model: presets, per-effect categories, GPU → Auto preset, `resolve()`, `presetTier()`, `choosePreset()`, `describe()`, adaptive step |
+| `gpu-level.js` | Shared StarHermit hardware-level module (`StarHermitGpu`, a classic script loaded before `dist/main.js`), copied from the platform tools, never edited here |
+| `src/gfx.ts` | Pure graphics quality model: presets, per-effect categories, hardware level → Auto preset (`detectLevel`, `presetForLevel`, `detectPreset`), per-preset `BUDGETS`/`budgetFor`/`particleCount`, `resolve()`, `presetTier()`, `choosePreset()`, `describe()`, adaptive step |
 | `src/gfxtext.ts` | Graphics-section strings in the nine required locales; locale = the game language |
 | `src/i18n.ts` | `T()` / `N()` / `lang()` / `onLanguage()` over the `MMI18N` runtime for the compiled modules |
 | `lang/strings.js`, `lang/i18n.js` | Translation tables (English keys, nine locales) and the runtime (`window.MMI18N`, live switching through `sh-language.js`, static-markup translation, `mm-language` event); plain scripts loaded before `dist/main.js` |
@@ -45,7 +46,7 @@ grid can hold — with a seeded board that anyone can replay move for move.
 | `score-script.js` | StarHermit platform script (`server=`): range-checks a ranked run's total sent through `StarHermit.submitScores` and posts it to the `high-score` leaderboard (canonical copy in the games repo's `tools/score-script.js`) |
 | `server.js` | Local static host; its legacy `/api/v1` routes (time, daily submit, leaderboard) are not called by the client |
 | `tests/rules.test.ts` | 21 vitest cases over rules + content |
-| `tests/gfx.test.ts` | 16 vitest cases over the graphics model and its locale strings |
+| `tests/gfx.test.ts` | 16 vitest cases (hardware level, budgets) over the graphics model and its locale strings |
 | `tests/platform.test.ts` | 6 vitest cases: the StarHermit adapter over the real SDK with a stubbed, ETag-versioned fetch (token, nickname, `game:<slug>` cloud save, settings KV, bindings, invite, zero fetches standalone, sign-in on a `<uuid>.starhermit.com` host, a 412 save conflict reloaded/merged/re-saved) |
 | `tests/i18n.test.ts` | 4 vitest cases: every key used in markup and code exists in all nine locales, content texts, live switching, Graphics/account strings |
 | `tests/e2e.mjs` | Playwright-core playthrough of the real UI at desktop and mobile |
@@ -342,15 +343,13 @@ on the ground that fades into distance fog, and glassy bevelled title tiles on t
 **Particles** are accent-coloured motes rising slowly in a ring around (never over) the board.
 Ambient motion (motes, light drift) stops under reduced motion. The settings sheet's
 **Graphics** section offers, after Theme and the 3D toggle: a quality preset (Auto — chosen from
-the GPU's unmasked renderer string, where software renderers get Low, discrete GPUs and Apple M
-get High, others Balanced, and touch devices are capped at Balanced — Low, Balanced, High,
-Ultra), a render scale (50–200 % of the preset's), a select per effect — shadows
+the StarHermit hardware level, below — Low, Balanced, High, Ultra), a render scale (50–200 % of the preset's), a select per effect — shadows
 off/low/medium/high, ambient occlusion off/on/high, bloom, colour grade, anti-aliasing
 off/FXAA/SMAA/MSAA, reflections, tile detail plain/detailed, particles off/low/high — each
 defaulting to "From preset (…)", adaptive resolution (on by default: over 90-frame windows the
 resolution steps down 10 % to a floor of 60 % when frames average over 26 ms, back up 5 % under
 14 ms) and a frame-rate readout (bottom-left, never over controls), plus a summary line
-"GPU · cost · W×H px". Choosing a preset clears the overrides. Changes apply immediately,
+"GPU · Level N · cost · W×H px" ("Level" localized). Choosing a preset clears the overrides. Changes apply immediately,
 without a reload, and are saved in `mm-settings-v1.gfx`; `body` (and the canvas) carry
 `data-gfx-preset`. If the post chain cannot be built the board renders without it and the
 section says so; with the 3D board off, it says the options apply when it is on.
@@ -358,12 +357,45 @@ section says so; with the 3D board off, it says the options apply when it is on.
 | Preset | Pixel-ratio cap × scale | Shadows | AO | Bloom | Grade | AA | Reflections | Detail | Particles |
 |---|---|---|---|---|---|---|---|---|---|
 | Low | 1 × 1 | off | off | off | off | MSAA (canvas) | off | plain | off |
-| Balanced | 1.5 × 1 | 1024² | off | on | on | FXAA | on | detailed | low (70) |
-| High | 2 × 1 | 2048² | on | on | on | SMAA | on | detailed | high (220) |
-| Ultra | 2 × 1.25 | 4096² | high | on | on | MSAA (4× target) | on | detailed | high (220) |
+| Balanced | 1.5 × 1 | 1024² | off | on | on | FXAA | on | detailed | low (⅓ of budget) |
+| High | 2 × 1 | 2048² | on | on | on | SMAA | on | detailed | high |
+| Ultra | 2 × 1.25 | 4096² | high | on | on | MSAA (4× target) | on | detailed | high |
 
 Low renders straight to the canvas with no composer, so it costs no more than the pre-preset
 board did.
+
+**Hardware-level detection.** `gpu-level.js` (shared StarHermit copy, `StarHermitGpu`) rates the WebGL
+unmasked renderer plus device facts (`detectSystem()`: phone/tablet, cores, memory, screen) on the
+StarHermit hardware level 0–20 (0 = Galaxy S20 / Intel UHD or weaker, every software renderer and no
+WebGL; 20 = RTX 5090; each level ≈ 1.23×; laptop parts two levels below desktop; phones, tablets and
+≤ 4 GB machines capped at 9). `gfx.ts` maps it with `presetForLevel(level, { low: 0, balanced: 4,
+high: 10, ultra: 17 })`, so Auto picks Ultra on strong GPUs; adaptive resolution still steps down when
+slow. Headless SwiftShader is level 0 → Low. Phones and tablets pace Auto FPS at half the display
+refresh rate ("Auto (half refresh rate)") and start at 16 simultaneous sounds (shared
+`game-options.js`).
+
+**Per-preset budgets** (`BUDGETS` / `budgetFor` in `src/gfx.ts`). Each preset holds 60 FPS on the
+weakest GPU Auto gives it — Low at level 0, Balanced 4, High 10, Ultra 17. Board, tiles, input and
+rules are identical on every preset; only visuals change. The ambient-particle count is tuned at the
+floor level and scales up within the preset on faster GPUs (`StarHermitGpu.scaleBudget`, ≤ 2×, at most
+640); Particles "low" draws a third of it.
+
+| Budget | Low | Balanced | High | Ultra |
+|---|---|---|---|---|
+| Shading model (tiles, cells, slab) | Lambert | Standard | Physical (clear coat) | Physical |
+| Tile-number / grid texture | 128 px | 256 px | 256 px | 512 px |
+| Rounded-box segments, tiles (cells/slab one fewer; Tile detail on) | 2 | 2 | 4 | 6 |
+| Ambient particles at Particles high | 90 | 150 | 220 | 320 |
+| Bloom / GTAO resolution | ½ | ½ | ½ | full |
+
+**Benchmark** (`node tools/gfx-bench.mjs merge-matrix`; hook `tests/gfx-bench.mjs` picks the preset
+in Settings → Graphics, starts Journey stage 1 and keeps sliding with the arrow keys, pressing Next /
+Retry at the results). Measured 2026-10-17 (GPU ms above the draws-skipped floor, projected to the
+preset's floor level; CPU p90 on the RTX 5090 run):
+
+- Desktop 1920×1080: PASS low (typical 0.00 / slow 0.00 ms GPU, CPU 0.40 ms); PASS balanced (1.61 /
+  0.04, CPU 0.80); PASS high (1.79 / 1.06, CPU 1.10); PASS ultra (2.74 / 3.35, CPU 1.10).
+- Mobile 390×844 @3×: PASS low (0.00 / 0.41, CPU 0.40); PASS balanced (0.00 / 0.12, CPU 0.70).
 
 **Hero of the screen.** On the title, the key-art plate with the four bobbing sample tiles over
 it. In play, the lit board — the rails are deliberately quiet, low-contrast text.
@@ -571,8 +603,10 @@ calls into game internals to make progress.
 
 ## 14. Testing and acceptance criteria
 
-**`npm test` (vitest, 47 cases, including the 6 StarHermit adapter cases and 4 localization cases).** `tests/gfx.test.ts` (16): `detectPreset` on SwiftShader,
-llvmpipe, NVIDIA, AMD, Apple M, Intel, Adreno and empty strings plus the touch cap; `resolve()`
+**`npm test` (vitest, 47 cases, including the 6 StarHermit adapter cases and 4 localization cases).** `tests/gfx.test.ts` (16): hardware level → preset
+(SwiftShader/llvmpipe/no WebGL, AMD Radeon Graphics and Intel UHD → Low, Iris Xe → Balanced, GTX 1070 →
+High, RTX 4080/5090 → Ultra, phones such as Adreno 740 capped at Balanced); the per-preset budget table
+(explicit, non-decreasing, floor-level tuned, scaling with the level, particle share per tier); `resolve()`
 for Auto, explicit presets, overrides, invalid values and render-scale clamping; every preset
 defining every category; `choosePreset` clearing overrides; `describe()` text; the adaptive
 step; and every locale carrying every Graphics string. `tests/rules.test.ts` (21): `slideLine` merge-once semantics,
@@ -587,7 +621,7 @@ ids, mastery cadence, five themes with full ramps, achievements, lesson fields) 
 **`npm run test:e2e` (`tests/e2e.mjs`), two passes — desktop 1280×800 and mobile 390×844 with
 touch, both must pass:** load and title visible; Settings → Graphics shows "Auto (detected:
 Low)" on the software GPU, Low then High apply live (`data-gfx-preset` on body and canvas, SMAA
-and bloom in the summary), a bloom override leaves the summary and persists, a reload keeps
+and bloom and "Level 0" in the summary), a bloom override leaves the summary and persists, a reload keeps
 preset and override, and choosing Auto clears the override; **Language** (own signed-in context, stubbed StarHermit API:
 Automatic resolves to fr-CA from `GET /api/v1/me/language`; a journey run starts in French; Pause →
 Language → Italian re-renders the sheet, Graphics labels, HUD and objective without restarting the run
