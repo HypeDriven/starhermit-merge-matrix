@@ -14,7 +14,7 @@
     "native/platform.ts": {"sha256": "1136724dfa332303bfe8a3348097c0883e36f6245af73e8d6429e349229ec219", "size": 10710},
     "native/quality.ts": {"sha256": "cc60115d67e7130bd15bab7f26fa45a81f74676f976f86f43c6cf01dad92bf05", "size": 3557},
     "native/render.ts": {"sha256": "78c99b47d2ebb132fbc7b356598c676c7feecf5c55cef7d0aa2e7bf1e9337e4f", "size": 26734},
-    "native/screens.ts": {"sha256": "531b90b930e7fde018429c1f60e352bbb9c8b88cc6573c967a405773d39b4384", "size": 36257},
+    "native/screens.ts": {"sha256": "3e383c9949089f5a6b70b3982dae1d77a457026c31e4c83d1396070e8110ca89", "size": 36354},
     "native/style.ts": {"sha256": "2da9f4a048955c754418f6646b5407cecab22c315a47d3f8aed356d223798e5d", "size": 2838},
     "score-script.js": {"sha256": "762eda4323fbe38bb29abf1117ec1d637253e288024f9aa8fcb5735b81ef2902", "size": 2488},
     "sfx/achievement-fanfare.opus": {"sha256": "530cd8bf3329de879907adbdba665c8da1ee2d133e472b3ae43bcafff2d7cf2e", "size": 28064},

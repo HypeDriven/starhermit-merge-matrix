@@ -64,7 +64,7 @@ const touch = [
   ['swipes', 'Out of moves'], ['wait', 1500], ['shot', 'results'], ['role', 'Retry'], ['wait', 2500], ['swipe', 'left'], ['wait', 800],
   ['shot', 'play'], ['expect', 'Moves left: 59.'], ['role', 'Pause'], ['wait', 1000], ['shot', 'paused'], ['role', '3D board (WebGL)'], ['wait', 300],
   ['role', 'Resume'], ['wait', 800], ['swipe', 'down'], ['wait', 800], ['shot', 'flat'], ['expect', 'Moves left: 58.'], ['role', 'Pause'], ['wait', 800],
-  ['role', '3D board (WebGL)'], ['wait', 300], ['role', 'Leave run'], ['wait', 1000], ['expect', 'A run is in progress.'],
+  ['role', '3D board (WebGL)'], ['wait', 300], ['role', 'Resume'], ['wait', 800], ['role', 'Leave'], ['wait', 1000], ['expect', 'A run is in progress.'],
 ];
 const views = [
   { name: 'desktop', viewport: { width: 1366, height: 768 }, steps: desktop },
@@ -93,10 +93,10 @@ for (const v of views) {
   await page.waitForTimeout(4000); // the first press can be lost while the runtime starts up
   const press = async (loc) => (v.hasTouch ? loc.tap({ timeout: 10000 }) : loc.click({ timeout: 10000 }));
   const seen = async (text) => (await page.getByText(text).count().catch(() => 0)) > 0 || (await page.getByLabel(text).count().catch(() => 0)) > 0;
-  const board = async () => page.getByLabel('Merge Matrix board').first().boundingBox({ timeout: 5000 }).catch(() => null);
-  async function swipe(dir) {
+  const board = async () => page.getByText('Merge Matrix board', { exact: true }).first().boundingBox({ timeout: 5000 }).catch(() => null);
+  async function swipe(dir, quiet = false) {
     const box = await board();
-    if (!box) { problems.push('board not found'); return; }
+    if (!box) { if (!quiet) problems.push('board not found'); return; }
     const [dx, dy] = DIRS[dir];
     const x0 = box.x + box.width / 2 - dx * box.width / 2, y0 = box.y + box.height / 2 - dy * box.height / 2;
     const pts = Array.from({ length: 7 }, (_, i) => ({ x: x0 + dx * box.width * i / 6, y: y0 + dy * box.height * i / 6 }));
@@ -120,7 +120,7 @@ for (const v of views) {
         let ok = false;
         for (let i = 0; i < 240 && !ok; i++) {
           if (op === 'cycle') { await page.keyboard.down(CYCLE[i % 4]); await page.waitForTimeout(60); await page.keyboard.up(CYCLE[i % 4]); await page.waitForTimeout(140); }
-          else { await swipe(['left', 'down', 'right', 'up'][i % 4]); await page.waitForTimeout(250); }
+          else { await swipe(['left', 'down', 'right', 'up'][i % 4], true); await page.waitForTimeout(250); }
           if (i % 4 === 3) ok = await seen(a);
         }
         if (!ok) problems.push(`never reached "${a}"`);

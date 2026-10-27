@@ -469,7 +469,10 @@ function playScreen(L: Layout, top: number): void {
     render.cellRects().forEach((row, r) => row.forEach((rect, c) => {
       ui.id(`cell-${r}-${c}`).target(cellLabel(st.board[r]![c]!, r, c), rect, { role: "label" });
     }));
-  } else flatBoard(pf, L);
+  } else {
+    ui.target(T("Merge Matrix board"), { x: wx, y: wy, width: ww, height: wh }, { role: "label" });
+    flatBoard(pf, L);
+  }
   if (app.countdown) {
     draw.box(wx, wy, ww, wh, "dim");
     draw.text(String(app.countdown.n), wx + ww / 2, wy + wh / 2 - 40 * sc, { size: 64 * sc, weight: "900", align: "center", color: accentColor() });
@@ -485,7 +488,7 @@ function flatBoard(pf: { x: number; y: number; w: number; h: number }, L: Layout
   const g = 8;
   const cw = (side - 2 * g - (n - 1) * g) / n;
   ui.place("dom-board", { anchor: "top-start", x: pf.x + (pf.w - side) / 2, y: pf.y + (pf.h - side) / 2 }, () => {
-    ui.style("board-flat", { width: side, height: side, padding: g }).id("dom-board-grid").grid(T("Merge Matrix board"), () => {
+    ui.style("board-flat", { width: side, height: side, padding: g }).id("dom-board-grid").grid(T("Board"), () => {
       for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
         const v = st.board[r]![c]!;
         ui.id(`cell-${r}-${c}`).widget(cellLabel(v, r, c), { role: "image", size: { width: cw, height: cw }, draw: (rect) => {
