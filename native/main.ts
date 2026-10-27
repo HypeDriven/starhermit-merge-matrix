@@ -465,7 +465,9 @@ function boardInput(): void {
     if (q.kind === "down") {
       down = null;
       const inside = q.x >= boardRect.x && q.y >= boardRect.y && q.x <= boardRect.x + boardRect.w && q.y <= boardRect.y + boardRect.h;
-      if (!canMove() || !inside || ui.pointerOver()) continue;
+      // No widget sits on the board (the cell targets and the flat board's cells take no presses; ui.pointerOver()
+      // reads true over those targets on the web runtime), and the sheet's scrim stops canMove().
+      if (!canMove() || !inside) continue;
       down = { x: q.x, y: q.y };
       audio.start();
       continue;
