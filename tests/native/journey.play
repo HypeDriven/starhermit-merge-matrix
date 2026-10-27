@@ -1,0 +1,33 @@
+# Desktop: Journey stage 1 (goal 128) from the title, slid to the end of the run (left, down, right, up); the results offer the next stage; the grid shows stage 1 completed.
+# viewport 1366x768@1
+until 300 =Play
+frames 150
+click =Journey
+until 60 Forty stages
+frames 10
+save journey
+click Stage 1, goal 128
+until 120 Objective
+frames 30
+repeat 20000 until Milestone reached
+  key ArrowLeft 1
+  frames 2
+  key ArrowDown 1
+  frames 2
+  key ArrowRight 1
+  frames 2
+  key ArrowUp 1
+  frames 2
+end
+frames 30
+save journey-results
+expect Next stage
+click =Menu
+until 60 =Journey
+frames 10
+expect 1/40 stages
+click =Journey
+until 60 Forty stages
+frames 10
+expect Stage 1, goal 128, 4×4, theme Dark Matrix, completed
+save journey-done

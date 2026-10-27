@@ -2,8 +2,10 @@
  * Merge Matrix — versioned content: journey stages, lessons, challenges, themes, achievements.
  * All content is generated deterministically from authored parameters, then validated offline.
  */
-import { createGame, applyMove, legalMoves, scoreTotal, DIRS, type RulesOptions, type GameState } from './rules.js';
-import { N } from './i18n.js';
+import { createGame, applyMove, legalMoves, DIRS, type RulesOptions } from './rules.ts';
+
+/** Marks an English key that is translated where it is shown (native/i18n.ts T). */
+const N = (key: string): string => key;
 
 export const CONTENT_VERSION = 1;
 

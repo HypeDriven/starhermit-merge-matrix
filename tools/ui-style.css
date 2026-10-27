@@ -1,0 +1,132 @@
+/* Merge Matrix — the browser build's style.css rewritten class-based for the
+   engine's UI (`npm run css` converts it into assets/ui-style.json).
+   Element selectors, ids, attribute selectors and @media do not convert:
+   every widget names its classes, and the breakpoints (desktop ≥ 1024 px with
+   the rails at the sides, compact below with the rails above and below the
+   board, landscape phone with narrow rails) are layouts picked in
+   native/screens.ts. The theme's colours are tokens native/style.ts sets per
+   theme (ui.ts applySettingsToDom); high contrast, larger text and reduced
+   motion are the runtime's options. */
+
+:root {
+  --bg: #0a0e1a;
+  --panel: #131b2e;
+  --panel2: #1d2942;
+  --text: #e8ecf6;
+  --muted: #9aa7c4;
+  --accent: #41d9c0;
+  --danger: #ff5a7a;
+  --on-accent: #07231e;
+  --focus: #41d9c0;
+  --scrim: #04060cbf;
+}
+
+* { box-sizing: border-box; }
+
+/* ------------------------------------------------------------- text */
+.brand { color: var(--text); font-size: 18px; font-weight: 700; }
+.h2 { color: var(--text); font-size: 24px; font-weight: 700; }
+.h3 { color: var(--text); font-size: 16px; font-weight: 700; }
+.p { color: var(--text); font-size: 16px; }
+.note { color: var(--muted); font-size: 14px; }
+.note-good { color: var(--accent); font-size: 14px; }
+.warn-text { color: var(--danger); font-size: 16px; }
+.headline { color: var(--text); font-size: 24px; font-weight: 800; }
+.stat-k { color: var(--muted); font-size: 14px; }
+.stat-v { color: var(--text); font-size: 14px; font-weight: 700; }
+.card-title { color: var(--text); font-size: 16px; font-weight: 700; }
+.card-text { color: var(--muted); font-size: 14px; }
+.kbd { color: #e8ecf699; font-size: 12px; }
+.score-k { color: var(--text); font-size: 16px; font-weight: 700; }
+.score-v { color: var(--text); font-size: 16px; }
+.total-k { color: var(--accent); font-size: 16px; font-weight: 800; }
+.caption-text { color: #ffffff; font-size: 14px; }
+.set-label { color: var(--text); font-size: 16px; }
+.countdown-text { color: var(--accent); font-size: 64px; font-weight: 900; }
+.hero-t1 { color: var(--accent); font-size: 22px; font-weight: 800; }
+.hero-t2 { color: #3f8cff; font-size: 22px; font-weight: 800; }
+.hero-t3 { color: #ffe066; font-size: 22px; font-weight: 800; }
+.hero-t4 { color: #ff8c5a; font-size: 22px; font-weight: 800; }
+
+/* ------------------------------------------------------------- surfaces */
+.page { background: var(--bg); border-radius: 0; }
+.scrim { background: var(--scrim); border-radius: 0; }
+.dim { background: #00000066; border-radius: 0; }
+.topbar { background: var(--panel); border-bottom: 1px solid var(--panel2); border-radius: 0; padding: 8px 16px; }
+.title-art {
+  background: radial-gradient(farthest-corner at 50% 22%, #41d9c01a, transparent 60%), url(../assets/title-keyart.webp) center / cover, var(--bg);
+  border-radius: 18px; padding: 8px 0 16px; box-shadow: inset 0 -60px 60px -30px var(--bg);
+}
+.title-art-plain { background: var(--bg); border-radius: 18px; padding: 8px 0 16px; }
+.results-art {
+  background: linear-gradient(to bottom, #0a0e1ab3, var(--bg) 66%), url(../assets/results-backdrop.webp) top center / cover;
+  border-radius: 18px; padding: 16px;
+}
+.results-plain { background: var(--bg); border-radius: 18px; padding: 16px; }
+.hero { background: var(--panel2); border-radius: 10px; }
+.panel { background: var(--panel); border: 1px solid var(--panel2); border-radius: 14px; padding: 16px; }
+.panel-warn { background: var(--panel); border: 1px solid var(--danger); border-radius: 14px; padding: 16px; }
+.card { background: var(--panel); border: 1px solid var(--panel2); border-radius: 14px; padding: 16px; }
+.sheet { background: var(--panel); border: 1px solid var(--panel2); border-radius: 18px; padding: 20px; }
+.score-row { border-bottom: 1px solid var(--panel2); border-radius: 0; padding: 6px 13px; }
+.score-total { border-radius: 0; padding: 6px 13px; }
+.board-flat { background: var(--panel); border-radius: 14px; }
+.caption { background: #000000cc; border-radius: 8px; padding: 5px 13px; }
+.toast { background: var(--panel2); border: 1px solid var(--accent); border-radius: 10px; padding: 10px 16px; box-shadow: 0 6px 20px #00000073; }
+
+/* ------------------------------------------------------------- buttons */
+.btn {
+  min-height: 44px; padding: 13px 18px; border-radius: 12px; border: 1px solid var(--panel2);
+  background: var(--panel2); color: var(--text); font-size: 16px; text-align: left;
+}
+.btn:hover { border: 1px solid var(--accent); }
+.btn:disabled { opacity: 0.5; }
+.btn:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.primary {
+  min-height: 44px; padding: 13px 18px; border-radius: 12px; border: 1px solid var(--accent);
+  background: var(--accent); color: var(--on-accent); font-size: 16px; font-weight: 700; text-align: center;
+}
+.primary:hover { border: 1px solid var(--text); }
+.primary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.small {
+  min-height: 44px; padding: 8px 13px; border-radius: 12px; border: 1px solid var(--panel2);
+  background: var(--panel2); color: var(--text); font-size: 14px; text-align: left;
+}
+.small:hover { border: 1px solid var(--accent); }
+.small:disabled { opacity: 0.5; }
+.small:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.danger {
+  min-height: 44px; padding: 8px 13px; border-radius: 12px; border: 1px solid var(--danger);
+  background: var(--panel2); color: var(--danger); font-size: 14px; text-align: left;
+}
+.danger:hover { border: 2px solid var(--danger); }
+.danger:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.icon-btn {
+  min-height: 44px; min-width: 44px; padding: 6px 10px; border-radius: 10px; border: 1px solid var(--panel2);
+  background: var(--panel2); color: var(--text); font-size: 18px; text-align: center;
+}
+.icon-btn:hover { border: 1px solid var(--accent); }
+.icon-btn:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.mode-card {
+  min-height: 44px; padding: 16px; border-radius: 14px; border: 1px solid var(--panel2);
+  background: var(--panel); color: var(--text); font-size: 16px; text-align: left;
+}
+.mode-card:hover { border: 1px solid var(--accent); }
+.mode-card.active { border: 1px solid var(--accent); }
+.mode-card:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.jcell {
+  min-height: 44px; min-width: 44px; border-radius: 10px; border: 1px solid var(--panel2);
+  background: var(--panel); color: var(--text); font-size: 16px; font-weight: 700; text-align: center;
+}
+.jcell:hover { border: 1px solid var(--accent); }
+.jcell:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.jcell-mastery {
+  min-height: 44px; min-width: 44px; border-radius: 10px; border: 2px solid var(--accent);
+  background: var(--panel); color: var(--text); font-size: 16px; font-weight: 700; text-align: center;
+}
+.jcell-mastery:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.jcell-done {
+  min-height: 44px; min-width: 44px; border-radius: 10px; border: 1px solid var(--accent);
+  background: var(--accent); color: var(--on-accent); font-size: 16px; font-weight: 700; text-align: center;
+}
+.jcell-done:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }

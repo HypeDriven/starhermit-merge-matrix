@@ -1,0 +1,36 @@
+# Desktop: Practice 2048 on 4×4 from the title, a few slides by keys and a swipe, a hint, undo, the pause sheet, Leave; the title offers Resume.
+# viewport 1280x720@1
+until 300 =Play
+frames 150
+save title
+click =Play
+until 60 Choose a mode
+frames 10
+click Practice
+until 60 Setup
+frames 10
+save modes
+click =Start
+until 120 Objective
+frames 60
+key ArrowLeft 1
+frames 10
+key ArrowUp 1
+frames 10
+key KeyD 1
+frames 10
+swipe 50% 40% 50% 70% 8
+frames 30
+key KeyH 1
+frames 30
+save play
+key KeyZ 1
+frames 10
+key Escape 1
+until 60 Paused
+frames 10
+save pause
+click =Leave run
+until 60 Resume run
+frames 10
+save resume

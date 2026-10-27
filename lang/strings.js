@@ -9,13 +9,16 @@
   'use strict';
   var ROWS = [
     // ---- HUD, title
+    ['Status', 'Estado', 'Status', 'État', 'Status', 'Stato'],
+    ['Actions', 'Acciones', 'Aktionen', 'Actions', 'Ações', 'Azioni'],
+    ['Audio, graphics & accessibility', 'Audio, gráficos y accesibilidad', 'Audio, Grafik & Barrierefreiheit', 'Audio, graphismes et accessibilité', 'Áudio, gráficos e acessibilidade', 'Audio, grafica e accessibilità'],
+    ['Sound, graphics quality, language, reduced motion, high contrast and larger text are in the StarHermit Options.', 'El sonido, la calidad gráfica, el idioma, el movimiento reducido, el alto contraste y el texto más grande están en las Opciones de StarHermit.', 'Ton, Grafikqualität, Sprache, reduzierte Bewegung, hoher Kontrast und größere Schrift findest du in den StarHermit-Optionen.', 'Le son, la qualité graphique, la langue, les animations réduites, le contraste élevé et le texte agrandi se trouvent dans les Options StarHermit.', 'Som, qualidade gráfica, idioma, movimento reduzido, alto contraste e texto maior ficam nas Opções do StarHermit.', 'Audio, qualità grafica, lingua, movimento ridotto, alto contrasto e testo più grande sono nelle Opzioni di StarHermit.'],
     ['Score', 'Puntos', 'Punkte', 'Score', 'Pontos', 'Punti'],
     ['Best', 'Récord', 'Rekord', 'Record', 'Recorde', 'Record'],
     ['Moves', 'Movimientos', 'Züge', 'Coups', 'Jogadas', 'Mosse'],
     ['Time', 'Tiempo', 'Zeit', 'Temps', 'Tempo', 'Tempo'],
     ['Pause', 'Pausa', 'Pause', 'Pause', 'Pausar', 'Pausa'],
     ['Settings', 'Configuración', 'Einstellungen', 'Paramètres', 'Configurações', 'Impostazioni'],
-    ['Main menu', 'Menú principal', 'Hauptmenü', 'Menu principal', 'Menu principal', 'Menu principale'],
     ['Main', 'Principal', 'Haupt', 'Principal', 'Principal', 'Principale'],
     ['A run is in progress.', 'Hay una partida en curso.', 'Ein Lauf ist im Gange.', 'Une partie est en cours.', 'Há uma partida em andamento.', 'C’è una partita in corso.'],
     ['Resume run', 'Reanudar partida', 'Lauf fortsetzen', 'Reprendre la partie', 'Retomar partida', 'Riprendi la partita'],
@@ -30,7 +33,6 @@
     ['saving progress…', 'guardando el progreso…', 'Fortschritt wird gespeichert …', 'enregistrement de la progression…', 'salvando o progresso…', 'salvataggio dei progressi…'],
     ['sync offline — progress saves on this device', 'sincronización sin conexión: el progreso se guarda en este dispositivo', 'Synchronisierung offline – Fortschritt wird auf diesem Gerät gespeichert', 'synchronisation hors ligne — la progression est enregistrée sur cet appareil', 'sincronização offline — o progresso fica salvo neste dispositivo', 'sincronizzazione offline: i progressi sono salvati su questo dispositivo'],
     ['Player', 'Jugador', 'Spieler', 'Joueur', 'Jogador', 'Giocatore'],
-    ['Player {id}', 'Jugador {id}', 'Spieler {id}', 'Joueur {id}', 'Jogador {id}', 'Giocatore {id}'],
     ['{done}/40 stages', '{done}/40 etapas', '{done}/40 Etappen', '{done}/40 étapes', '{done}/40 etapas', '{done}/40 tappe'],
 
     // ---- modes
@@ -80,7 +82,6 @@
 
     // ---- play
     ['Objective', 'Objetivo', 'Ziel', 'Objectif', 'Objetivo', 'Obiettivo'],
-    ['Reach the goal tile.', 'Alcanza el bloque meta.', 'Erreiche den Zielblock.', 'Atteignez la tuile objectif.', 'Alcance o bloco meta.', 'Raggiungi il blocco obiettivo.'],
     ['Reach a {n} block.', 'Alcanza un bloque de {n}.', 'Erreiche einen {n}er-Block.', 'Atteignez un bloc {n}.', 'Alcance um bloco {n}.', 'Raggiungi un blocco da {n}.'],
     ['Moves left: {n}.', 'Movimientos restantes: {n}.', 'Verbleibende Züge: {n}.', 'Coups restants : {n}.', 'Jogadas restantes: {n}.', 'Mosse rimaste: {n}.'],
     ['Time limit {n}s.', 'Límite de tiempo {n} s.', 'Zeitlimit {n} s.', 'Limite de temps {n} s.', 'Limite de tempo {n} s.', 'Limite di tempo {n} s.'],
@@ -107,7 +108,6 @@
     ['No legal moves remain.', 'No quedan movimientos válidos.', 'Keine gültigen Züge mehr.', 'Plus aucun coup possible.', 'Não restam jogadas válidas.', 'Non restano mosse valide.'],
     ['only legal direction', 'única dirección válida', 'einzige mögliche Richtung', 'seule direction possible', 'única direção válida', 'unica direzione valida'],
     ['frees {n} cells with the best immediate merges', 'deja {n} celdas libres con las mejores uniones inmediatas', 'macht {n} Felder frei mit den besten direkten Verschmelzungen', 'libère {n} cases avec les meilleures fusions immédiates', 'libera {n} casas com as melhores junções imediatas', 'libera {n} celle con le migliori unioni immediate'],
-    ['3D unavailable — using the accessible board view.', '3D no disponible: se usa la vista accesible del tablero.', '3D nicht verfügbar – barrierefreie Brettansicht wird verwendet.', '3D indisponible — vue accessible du plateau utilisée.', '3D indisponível — usando a visualização acessível do tabuleiro.', '3D non disponibile: uso la vista accessibile del tabellone.'],
     ['empty, row {r} column {c}', 'vacía, fila {r} columna {c}', 'leer, Zeile {r} Spalte {c}', 'vide, ligne {r} colonne {c}', 'vazia, linha {r} coluna {c}', 'vuota, riga {r} colonna {c}'],
     ['{v}, row {r} column {c}', '{v}, fila {r} columna {c}', '{v}, Zeile {r} Spalte {c}', '{v}, ligne {r} colonne {c}', '{v}, linha {r} coluna {c}', '{v}, riga {r} colonna {c}'],
     ['{size}×{size} board, {empty} empty cells, tiles: {tiles}. Largest {max}.', 'Tablero de {size}×{size}, {empty} celdas vacías, bloques: {tiles}. Mayor {max}.', '{size}×{size}-Brett, {empty} freie Felder, Blöcke: {tiles}. Größter {max}.', 'Plateau {size}×{size}, {empty} cases vides, tuiles : {tiles}. Plus grande {max}.', 'Tabuleiro {size}×{size}, {empty} casas vazias, blocos: {tiles}. Maior {max}.', 'Tabellone {size}×{size}, {empty} celle vuote, blocchi: {tiles}. Il più grande {max}.'],
@@ -157,18 +157,11 @@
     ['Resume', 'Reanudar', 'Fortsetzen', 'Reprendre', 'Continuar', 'Riprendi'],
     ['Close', 'Cerrar', 'Schließen', 'Fermer', 'Fechar', 'Chiudi'],
     ['Audio', 'Audio', 'Audio', 'Audio', 'Áudio', 'Audio'],
-    ['Music', 'Música', 'Musik', 'Musique', 'Música', 'Musica'],
-    ['Effects', 'Efectos', 'Effekte', 'Effets', 'Efeitos', 'Effetti'],
-    ['Ambience', 'Ambiente', 'Umgebung', 'Ambiance', 'Ambiente', 'Ambiente'],
-    ['Mute all', 'Silenciar todo', 'Alles stumm', 'Tout couper', 'Silenciar tudo', 'Silenzia tutto'],
     ['Captions for sounds', 'Subtítulos de sonidos', 'Untertitel für Geräusche', 'Sous-titres des sons', 'Legendas dos sons', 'Sottotitoli per i suoni'],
     ['Graphics', 'Gráficos', 'Grafik', 'Graphismes', 'Gráficos', 'Grafica'],
     ['Theme', 'Tema', 'Design', 'Thème', 'Tema', 'Tema'],
     ['3D board (WebGL)', 'Tablero 3D (WebGL)', '3D-Brett (WebGL)', 'Plateau 3D (WebGL)', 'Tabuleiro 3D (WebGL)', 'Tabellone 3D (WebGL)'],
     ['Accessibility & controls', 'Accesibilidad y controles', 'Barrierefreiheit & Steuerung', 'Accessibilité et commandes', 'Acessibilidade e controles', 'Accessibilità e comandi'],
-    ['Reduced motion', 'Movimiento reducido', 'Weniger Bewegung', 'Animations réduites', 'Movimento reduzido', 'Movimento ridotto'],
-    ['High contrast', 'Alto contraste', 'Hoher Kontrast', 'Contraste élevé', 'Alto contraste', 'Contrasto elevato'],
-    ['Larger text', 'Texto más grande', 'Größerer Text', 'Texte plus grand', 'Texto maior', 'Testo più grande'],
     ['Left-handed action rail', 'Barra de acciones para zurdos', 'Aktionsleiste für Linkshänder', 'Barre d’actions pour gauchers', 'Barra de ações para canhotos', 'Barra azioni per mancini'],
     ['Haptics on touch', 'Vibración al tocar', 'Haptik bei Berührung', 'Vibrations au toucher', 'Vibração ao tocar', 'Vibrazione al tocco'],
     ['Replay tutorial', 'Repetir el tutorial', 'Anleitung wiederholen', 'Revoir le tutoriel', 'Repetir o tutorial', 'Ripeti il tutorial'],
@@ -234,4 +227,4 @@
   };
 
   root.MM_STRINGS = T;
-})(typeof self !== 'undefined' ? self : this);
+})(globalThis);

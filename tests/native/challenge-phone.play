@@ -1,0 +1,37 @@
+# Portrait phone (DPR 3): the 60-move Challenge started by touch and played to Out of moves by swipes on the board (left, down, right, up), then Retry and Leave.
+# viewport 390x844@3
+until 300 =Play
+frames 150
+save phone-title
+touch =Play
+until 60 Choose a mode
+frames 10
+touch Challenge
+until 60 Setup
+frames 10
+save phone-modes
+touch =Start
+until 120 Objective
+frames 60
+repeat 6000 until Out of moves
+  swipe 75% 45% 25% 45% 6
+  frames 3
+  swipe 50% 35% 50% 55% 6
+  frames 3
+  swipe 25% 45% 75% 45% 6
+  frames 3
+  swipe 50% 55% 50% 35% 6
+  frames 3
+end
+frames 30
+save phone-results
+touch =Retry
+until 120 Objective
+frames 30
+swipe 75% 45% 25% 45% 6
+frames 20
+save phone-play
+expect Moves left: 59.
+touch =Leave
+until 60 Resume run
+frames 10

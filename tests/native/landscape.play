@@ -1,0 +1,42 @@
+# Phone held sideways (DPR 3): the Daily challenge by touch, slides by keys, a hint, the pause sheet with the 3D board switched off (the flat board), Resume, a swipe on the flat board, the 3D board back on, Leave run.
+# viewport 844x390@3
+until 300 =Play
+frames 150
+touch Daily challenge
+until 120 Objective
+frames 60
+key ArrowLeft 1
+frames 4
+key ArrowDown 1
+frames 4
+key ArrowRight 1
+frames 4
+key ArrowUp 1
+frames 4
+key ArrowLeft 1
+frames 4
+key ArrowDown 1
+frames 4
+touch =Hint
+frames 20
+save land-play
+touch =Pause
+until 60 Paused
+frames 10
+save land-pause
+touch =3D board (WebGL)
+frames 10
+touch =Resume
+frames 20
+swipe 50% 40% 50% 85% 6
+frames 20
+save land-flat
+expect Moves 7
+key Escape 1
+until 60 Paused
+frames 10
+touch =3D board (WebGL)
+frames 5
+touch =Leave run
+until 60 Resume run
+frames 10

@@ -1,0 +1,29 @@
+# Desktop: How to play, the settings sheet from the title (theme Light Paper by keyboard), the Daily's title line, Score chase's setup, back to the title.
+# viewport 1280x720@1
+until 300 =Play
+frames 150
+click =How to play
+until 60 Seeds & fairness
+frames 10
+save help
+click =Back
+until 60 =Learn
+frames 10
+click =Settings
+until 60 Accessibility & controls
+frames 10
+expect Close
+save settings
+click =Close
+frames 10
+click =Play
+until 60 Choose a mode
+frames 10
+click Score chase
+until 60 Setup
+frames 10
+expect Signed in, this result is posted to the high-score leaderboard.
+save score-setup
+click =Back #2
+until 60 =Daily challenge
+frames 10

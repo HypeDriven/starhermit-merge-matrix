@@ -1,0 +1,57 @@
+# Desktop: the three Learn lessons from the title, each finished by sliding left, down, right, up; Next lesson leads on; Menu.
+# viewport 1280x720@1
+until 300 =Play
+frames 150
+click =Learn
+until 60 Slide the matrix
+frames 10
+save learn
+click 1. Slide the matrix
+until 120 Objective
+frames 30
+save lesson
+repeat 2000 until Lesson complete
+  key ArrowLeft 1
+  frames 2
+  key ArrowDown 1
+  frames 2
+  key ArrowRight 1
+  frames 2
+  key ArrowUp 1
+  frames 2
+end
+frames 30
+expect Achievement unlocked: First Light
+save lesson-results
+click =Next lesson
+until 120 Merge equals
+frames 10
+repeat 2000 until Lesson complete
+  key ArrowLeft 1
+  frames 2
+  key ArrowDown 1
+  frames 2
+  key ArrowRight 1
+  frames 2
+  key ArrowUp 1
+  frames 2
+end
+frames 30
+click =Next lesson
+until 120 Mind the empty cells
+frames 10
+repeat 4000 until Lesson complete
+  key ArrowLeft 1
+  frames 2
+  key ArrowDown 1
+  frames 2
+  key ArrowRight 1
+  frames 2
+  key ArrowUp 1
+  frames 2
+end
+frames 30
+save lesson3-results
+click =Menu
+until 60 =How to play
+frames 10
