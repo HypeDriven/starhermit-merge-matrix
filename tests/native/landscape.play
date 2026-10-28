@@ -6,17 +6,17 @@ touch Daily challenge
 until 120 Objective
 frames 60
 key ArrowLeft 1
-frames 4
+until 60 Moves 1
 key ArrowDown 1
-frames 4
+until 60 Moves 2
 key ArrowRight 1
-frames 4
+until 60 Moves 3
 key ArrowUp 1
-frames 4
+until 60 Moves 4
 key ArrowLeft 1
-frames 4
+until 60 Moves 5
 key ArrowDown 1
-frames 4
+until 60 Moves 6
 touch =Hint
 frames 20
 save land-play
@@ -28,7 +28,8 @@ touch =3D board (WebGL)
 frames 10
 touch =Resume
 frames 20
-swipe 50% 40% 50% 85% 6
+# up, against the last slide (down), so the swipe has tiles to move on any day's Daily board
+swipe 50% 85% 50% 40% 6
 frames 20
 save land-flat
 expect Moves 7

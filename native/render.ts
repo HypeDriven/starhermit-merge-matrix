@@ -115,6 +115,10 @@ interface MatParams {
 }
 /** Shading model per the budget: Lambert on Low, Standard on Balanced, the authored Physical (clear coat) on High/Ultra. */
 function litMaterial(p: MatParams): Material {
+  // Copies the Colors so materials never share one (three copies; the engine keeps the object).
+  p = { ...p };
+  if (p.color) p.color = p.color.clone();
+  if (p.emissive) p.emissive = p.emissive.clone();
   const tier = look?.budget.material ?? "standard";
   if (tier === "lambert") {
     const l: Record<string, unknown> = {};
