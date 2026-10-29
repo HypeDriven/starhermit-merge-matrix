@@ -16,7 +16,7 @@ grid can hold — with a seeded board that anyone can replay move for move.
 | Genre | Deterministic slide-and-merge number puzzle (2048 lineage, seeded/verified) |
 | Players | 1, with asynchronous daily comparison |
 | Session length | 3–6 min (lesson or challenge), 8–20 min (2048 practice run) |
-| Platforms | StarHermit engine script game (engine 1.24.0, host API 1.26, `engine.minor=20`): natively in the StarHermit client and in desktop and mobile browsers on the engine's web runtime; portrait and landscape |
+| Platforms | StarHermit engine script game (engine 1.24.0, host API 1.26, `engine.minor=26`): natively in the StarHermit client and in desktop and mobile browsers on the engine's web runtime; portrait and landscape |
 | Rendering | `starhermit:scene` (three.js r185 parity) 3D board drawn into the playfield between the `starhermit:ui` top bar and rails; a flat board drawn in the UI when the 3D board is switched off |
 | Build | TypeScript run directly by the runtime (`engine.entry=native/main.ts`); `tsc --noEmit` type-checks against `.starhermit/starhermit.d.ts`; `npm run package` writes the web loader `index.html` and `starhermit-files.json` |
 
@@ -327,7 +327,7 @@ tile bob and the countdown entirely.
 key directional light and an accent-tinted rim light, tone-mapped with ACES Filmic into sRGB;
 a point light in the theme accent drifts slowly across the glass and flares on merges.
 Effects by the runtime's graphics level (`frame().quality`, `native/quality.ts`): key-light
-shadows (shadow distance fitted to the board), image-based reflections (a PMREM-filtered
+shadows (an orthographic shadow box fitted to the board), image-based reflections (a PMREM-filtered
 `RoomEnvironment`, environment intensity 0.4), ambient occlusion for contact darkening, bloom with
 an HDR threshold of 2.0 so only the light-trace frame, the emissive sides of 128+ tiles (not on
 the light or high-contrast themes, and less on pale fills) and hot glints glow, a linear colour
@@ -472,7 +472,7 @@ second row rather than clipping, and nothing is sized to a fixed English string.
 ## 12. StarHermit integration
 
 `starhermit.txt` declares the engine (`engine.api=1`, `engine.entry=native/main.ts`,
-`engine.version=1.24.0`, `engine.minor=20`, capabilities platform, storage, clipboard),
+`engine.version=1.24.0`, `engine.minor=26`, capabilities platform, storage, clipboard),
 `launch=index.html` (the web loader), `server=score-script.js`, `cover=cover.jpg`, the owner id, the
 seven actions (`control.*` with their default keys, grouped) and their pad defaults
 (`engine.gamepad.*`). All platform features go through the runtime (`starhermit:platform`,

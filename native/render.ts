@@ -8,13 +8,13 @@
 // light's glow pulse and the camera shake on big merges. Rendering reads
 // board snapshots and never writes rules state.
 //
-// From three.js: light intensities are r183's ÷ π (the engine's convention);
-// RoomEnvironment(renderer) + PMREM give the reflections at the old
+// From three.js r183 (engine.minor 26): light intensities, shadow bias and box as render.ts set them;
+// RoomEnvironment(renderer) lowered as r183+ + PMREM give the reflections at the old
 // environmentIntensity 0.4 (three ignored the per-material envMapIntensity
 // values with scene.environment, so they are left out); the post chain
 // (GTAO, UnrealBloom threshold 2.0, the GradeShader in linear light before
 // the output, FXAA / SMAA / MSAA) is renderer.ao / bloom / grade / antialias;
-// the fitted orthographic shadow box is the engine's `shadow.distance`. The
+// the orthographic shadow box is render.ts's, fitted to the board. The
 // board sits between the HUD and the rails as the old <canvas> did: the
 // camera keeps the playfield's aspect and is offset into its rectangle with
 // setViewOffset. Adaptive resolution, the pixel-ratio cap and the frame-rate
@@ -22,7 +22,7 @@
 import {
   ACESFilmicToneMapping, AdditiveBlending, BoxGeometry, BufferAttribute, BufferGeometry, CanvasTexture, Color, DirectionalLight, Fog, Group,
   HemisphereLight, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, MeshLambertMaterial, MeshPhysicalMaterial, MeshStandardMaterial,
-  NoColorSpace, PerspectiveCamera, PlaneGeometry, PMREMGenerator, PointLight, Points, PointsMaterial, RepeatWrapping, RoomEnvironment,
+  NoColorSpace, OrthographicCamera, PerspectiveCamera, PlaneGeometry, PMREMGenerator, PointLight, Points, PointsMaterial, RepeatWrapping, RoomEnvironment,
   RoundedBoxGeometry, SRGBColorSpace, Vector3, renderer, scene,
   type Material, type Object3D, type Texture,
 } from "starhermit:scene";
@@ -40,15 +40,15 @@ renderer.toneMappingExposure = 1.0;
 const camera = new PerspectiveCamera(38, 1, 0.1, 100);
 renderer.camera = camera;
 
-const hemi = new HemisphereLight(0xbfd2ff, 0x0a0e1a, 0.9 / PI);
-const key = new DirectionalLight(0xffffff, 2.2 / PI);
+const hemi = new HemisphereLight(0xbfd2ff, 0x0a0e1a, 0.9);
+const key = new DirectionalLight(0xffffff, 2.2);
 key.position.set(3, 7, 4);
 key.shadow.bias = -0.0004;
 key.shadow.normalBias = 0.02;
 key.shadow.radius = 3;
-const rim = new DirectionalLight(0x66d9ff, 0.7 / PI);
+const rim = new DirectionalLight(0x66d9ff, 0.7);
 rim.position.set(-4, 3, -6);
-const GLOW_BASE = 8 / PI;
+const GLOW_BASE = 8;
 const glow = new PointLight(0x66d9ff, GLOW_BASE, 12);
 glow.position.set(0, 3, 2);
 scene.add(hemi, key, key.target, rim, glow);
@@ -388,8 +388,10 @@ export function buildBoard(newSize: number): void {
     boardMeshes.push(frameGroup);
   }
   // render.ts fitShadow: an orthographic box ±(size/2 + 0.9) from 4 to 14 along the light.
-  key.shadow.distance = 14;
-  key.shadow.camera.near = 4;
+  const cam = key.shadow.camera as OrthographicCamera, h = size / 2 + 0.9;
+  cam.left = -h; cam.right = h; cam.top = h; cam.bottom = -h;
+  cam.near = 4; cam.far = 14;
+  cam.updateProjectionMatrix();
   camFit = -1;
 }
 
@@ -424,7 +426,7 @@ export function setBoard(board: number[][], spawned?: Set<string>, merged?: Set<
 
 /** A merge's light pulse (and, with motion, a little camera shake), 0–1 by the points it scored. */
 export function pulseGlow(intensity: number): void {
-  glow.intensity = GLOW_BASE + intensity * 14 / PI;
+  glow.intensity = GLOW_BASE + intensity * 14;
   if (!reducedMotion) shake = Math.min(0.5, shake + intensity * 0.1);
 }
 
@@ -499,12 +501,16 @@ export function applyLook(next: Look): void {
   key.castShadow = on;
   if (on) key.shadow.mapSize = next.shadows;
   if (next.reflections && !envTex) {
-    try { envTex = new PMREMGenerator(renderer).fromScene(new RoomEnvironment(renderer), 0.04).texture; }
+    try {
+      const room = new RoomEnvironment(renderer);
+      room.position.y = -3.5; // three.js r183+ lowers the room
+      envTex = new PMREMGenerator(renderer).fromScene(room, 0.04).texture;
+    }
     catch (e) { console.warn(`environment: ${e instanceof Error ? e.message : String(e)}`); }
   }
   scene.environment = next.reflections ? envTex : null;
   scene.environmentIntensity = 0.4;
-  hemi.intensity = (next.reflections ? 0.45 : 0.7) / PI;
+  hemi.intensity = next.reflections ? 0.45 : 0.7;
   clearTileMaterials();
   dropTextures(["label:", "grid:"]);
   applyThemeLights();

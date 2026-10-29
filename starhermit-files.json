@@ -13,7 +13,7 @@
     "native/main.ts": {"sha256": "9844f4a40274e1a4bad1af0e8951a6c254f1a0075268ee68910f3f5313e98474", "size": 22345},
     "native/platform.ts": {"sha256": "1136724dfa332303bfe8a3348097c0883e36f6245af73e8d6429e349229ec219", "size": 10710},
     "native/quality.ts": {"sha256": "cc60115d67e7130bd15bab7f26fa45a81f74676f976f86f43c6cf01dad92bf05", "size": 3557},
-    "native/render.ts": {"sha256": "d5ce6ed5ea4aaa7f868f50084442bb683b9000ce5a9c62eef76ed7ec81adfaeb", "size": 26940},
+    "native/render.ts": {"sha256": "0e53705fcf6fd2bf084964c231d1e499b72399427d7079aa187bb63da9d74343", "size": 27203},
     "native/screens.ts": {"sha256": "3e383c9949089f5a6b70b3982dae1d77a457026c31e4c83d1396070e8110ca89", "size": 36354},
     "native/style.ts": {"sha256": "2da9f4a048955c754418f6646b5407cecab22c315a47d3f8aed356d223798e5d", "size": 2838},
     "score-script.js": {"sha256": "762eda4323fbe38bb29abf1117ec1d637253e288024f9aa8fcb5735b81ef2902", "size": 2488},
@@ -39,7 +39,7 @@
     "src/progress.ts": {"sha256": "ec49f76f4897cfe26dcd96ec49ded9fcafafd2fb57a88365a52df3451fcb31aa", "size": 7991},
     "src/rules.ts": {"sha256": "cc178d8f997398b24199dfc6690dc99a6c73c5f2562c1ffb5b796f24b736b0c8", "size": 11865},
     "src/sh-strings.ts": {"sha256": "c85920971a6594e119f52f9738ed76250095015d90cfb3a02be0a4a50675c89c", "size": 5213},
-    "starhermit.txt": {"sha256": "2a2b5e48222e2cd92d37c2cb837aa5b91331425b8eec57f9c27c4843ba8f087a", "size": 1599}
+    "starhermit.txt": {"sha256": "4d5bc6d80559bbc82fe6cfe4530b67bc6c37544821775ec53b5e7803bbd4ce21", "size": 1599}
   },
   "excluded": ["LICENSE.md", "coverart.png", "favicon.svg", "node_modules/", "package-lock.json", "package.json", "server.js", "sfx/manifest.json", "sfx/manifest.md", "sfx/manifest.txt", "spec.md", "tests/", "tools/", "tsconfig.json"],
   "format": 1
