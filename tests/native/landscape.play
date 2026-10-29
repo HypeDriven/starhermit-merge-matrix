@@ -1,21 +1,22 @@
 # Phone held sideways (DPR 3): the Daily challenge by touch, slides by keys, a hint, the pause sheet with the 3D board switched off (the flat board), Resume, a swipe on the flat board, the 3D board back on, Leave run.
 # viewport 844x390@3
+# The six key slides are placeholders that tests/native.mjs fills from the rules for today's Daily board, so each is legal and the swipe up after them moves tiles.
 until 300 =Play
 frames 150
 touch Daily challenge
 until 120 Objective
 frames 60
-key ArrowLeft 1
+key {{M1}} 1
 until 60 Moves 1
-key ArrowDown 1
+key {{M2}} 1
 until 60 Moves 2
-key ArrowRight 1
+key {{M3}} 1
 until 60 Moves 3
-key ArrowUp 1
+key {{M4}} 1
 until 60 Moves 4
-key ArrowLeft 1
+key {{M5}} 1
 until 60 Moves 5
-key ArrowDown 1
+key {{M6}} 1
 until 60 Moves 6
 touch =Hint
 frames 20
@@ -28,7 +29,7 @@ touch =3D board (WebGL)
 frames 10
 touch =Resume
 frames 20
-# up, against the last slide (down), so the swipe has tiles to move on any day's Daily board
+# up: tests/native.mjs picks the slides so that up is legal here
 swipe 50% 85% 50% 40% 6
 frames 20
 save land-flat

@@ -16,7 +16,7 @@ grid can hold — with a seeded board that anyone can replay move for move.
 | Genre | Deterministic slide-and-merge number puzzle (2048 lineage, seeded/verified) |
 | Players | 1, with asynchronous daily comparison |
 | Session length | 3–6 min (lesson or challenge), 8–20 min (2048 practice run) |
-| Platforms | StarHermit engine script game (engine 1.22.0, host API 1.21, `engine.minor=20`): natively in the StarHermit client and in desktop and mobile browsers on the engine's web runtime; portrait and landscape |
+| Platforms | StarHermit engine script game (engine 1.24.0, host API 1.26, `engine.minor=20`): natively in the StarHermit client and in desktop and mobile browsers on the engine's web runtime; portrait and landscape |
 | Rendering | `starhermit:scene` (three.js r185 parity) 3D board drawn into the playfield between the `starhermit:ui` top bar and rails; a flat board drawn in the UI when the 3D board is switched off |
 | Build | TypeScript run directly by the runtime (`engine.entry=native/main.ts`); `tsc --noEmit` type-checks against `.starhermit/starhermit.d.ts`; `npm run package` writes the web loader `index.html` and `starhermit-files.json` |
 
@@ -472,7 +472,7 @@ second row rather than clipping, and nothing is sized to a fixed English string.
 ## 12. StarHermit integration
 
 `starhermit.txt` declares the engine (`engine.api=1`, `engine.entry=native/main.ts`,
-`engine.version=1.22.0`, `engine.minor=20`, capabilities platform, storage, clipboard),
+`engine.version=1.24.0`, `engine.minor=20`, capabilities platform, storage, clipboard),
 `launch=index.html` (the web loader), `server=score-script.js`, `cover=cover.jpg`, the owner id, the
 seven actions (`control.*` with their default keys, grouped) and their pad defaults
 (`engine.gamepad.*`). All platform features go through the runtime (`starhermit:platform`,
@@ -541,7 +541,7 @@ changed. Nothing 3D renders off the play screen or with the flat board. The undo
   `learn.play` (all three lessons to their results, Next lesson), `journey.play` (stage 1 to "Milestone
   reached", Next stage, the grid shows it completed), `challenge-phone.play` (390×844 @3: the 60-move
   challenge by swipes to Out of moves, Retry), `landscape.play` (844×390 @3: the Daily by touch, hint,
-  pause sheet, the flat board with a swipe, Leave run), `menus.play` (help, settings, Score chase setup).
+  pause sheet, the flat board with a swipe, Leave run; its six key slides are placeholders `tests/native.mjs` fills from the rules with legal slides for that UTC day's Daily, leaving up legal for the swipe), `menus.play` (help, settings, Score chase setup).
 
 **Browser check** (`npm run test:browser`, `tools/browser-play.mjs`): the packaged loader in Chrome on
 the GPU at 1366×768, 390×844 @3 and 844×390 @3 — the first lesson by keys to its results and a Practice

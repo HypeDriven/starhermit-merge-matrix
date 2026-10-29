@@ -6,7 +6,7 @@
     "cover.jpg": {"sha256": "2d2814fb41b88ce7f33b0121fba31535adf0b20bc7d71f8c064c2b63f984e4d4", "size": 134089},
     "favicon.png": {"sha256": "3b7fa51995995699fec319f412bd36b860728c220a73fabfa784cf674bfea6fe", "size": 61497},
     "icon.png": {"sha256": "0a0b00b31a462fdad8bd3088489b6191b60a50e27dc1d4e4c8814135a546748c", "size": 5613},
-    "index.html": {"sha256": "c7642445483420b4cd560cedbc8e926987d05c47f49e38e56599ae9393fb6da5", "size": 1763},
+    "index.html": {"sha256": "6ec75ab961ca644c9da805382b882a24be7fd262119766cc0506207a98a320f3", "size": 1763},
     "lang/strings.js": {"sha256": "070d7389be7954e185a1ba48e001428b0d0d08c01566beb7c6de95dcbf236f8d", "size": 38280},
     "native/audio.ts": {"sha256": "75a7bd0ba274163c9f038da7f6f24a62c3e8ba6e5a788fe06540043f6c2db4c3", "size": 8600},
     "native/i18n.ts": {"sha256": "9e1e8032a1daf6f7b6b5a4de55f2639c87caae70839780e472db139ebff061e1", "size": 3023},
@@ -39,7 +39,7 @@
     "src/progress.ts": {"sha256": "ec49f76f4897cfe26dcd96ec49ded9fcafafd2fb57a88365a52df3451fcb31aa", "size": 7991},
     "src/rules.ts": {"sha256": "cc178d8f997398b24199dfc6690dc99a6c73c5f2562c1ffb5b796f24b736b0c8", "size": 11865},
     "src/sh-strings.ts": {"sha256": "c85920971a6594e119f52f9738ed76250095015d90cfb3a02be0a4a50675c89c", "size": 5213},
-    "starhermit.txt": {"sha256": "3c8d4cc65b4b3e362147b6089418aba6c573f8c1acf2359261ffd5bf04ffce77", "size": 1599}
+    "starhermit.txt": {"sha256": "2a2b5e48222e2cd92d37c2cb837aa5b91331425b8eec57f9c27c4843ba8f087a", "size": 1599}
   },
   "excluded": ["LICENSE.md", "coverart.png", "favicon.svg", "node_modules/", "package-lock.json", "package.json", "server.js", "sfx/manifest.json", "sfx/manifest.md", "sfx/manifest.txt", "spec.md", "tests/", "tools/", "tsconfig.json"],
   "format": 1
