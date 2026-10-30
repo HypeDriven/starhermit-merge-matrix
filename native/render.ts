@@ -492,7 +492,7 @@ export function applyLook(next: Look): void {
   // render.ts GradeShader (linear, before the output): a gentle S-curve, a touch more saturation, cool shadows /
   // warm highlights, the 0.24 vignette.
   renderer.grade = next.grade ? {
-    space: "linear", overRange: "keep", contrast: 0.18, saturation: 1.1, shadows: [0.95, 0.98, 1.06], highlights: [1.03, 1.0, 0.97], split: [0.2, 0.8],
+    space: "linear", contrastCurve: "s", overRange: "keep", contrast: 0.18, saturation: 1.1, shadows: [0.95, 0.98, 1.06], highlights: [1.03, 1.0, 0.97], split: [0.2, 0.8],
     vignette: { amount: 0.24, inner: 0.35, outer: 0.85 },
   } : null;
   renderer.antialias = next.antialias;
