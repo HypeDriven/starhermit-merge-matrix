@@ -29,7 +29,7 @@ grid can hold — with a seeded board that anyone can replay move for move.
 | `native/main.ts` | Entry: the run (command path, undo, clock, countdown, lesson rules, results, records, achievements, leaderboard post), snapshot, screen state, input (actions, swipes), lifecycle |
 | `native/screens.ts` | The whole UI in `starhermit:ui`: top bar, title, modes + setup, journey, learn, help, results, play layouts and rails, flat board, pause/settings sheet, caption, toast |
 | `native/render.ts` | The 3D board on `starhermit:scene`: slab, instanced cells, tiles with canvas number textures, lights, environment, ground grid, particles, pop/pulse/glow/shake, camera framing into the playfield, accessibility cell rectangles |
-| `native/quality.ts` | The old four presets and budgets keyed by the runtime's quality tier and level |
+| `native/quality.ts` | The engine-owned effects from `levelSettings()`; the old art presets and budgets keyed by the level's tier |
 | `native/audio.ts` | Authored clips per event, rendered music notes and ambience loop, captions |
 | `native/platform.ts` | Save (`saves`) with foreign-save migration and conflict merge, device snapshot, game options (`settings`) with legacy-KV migration, player, invite, platform clock, leaderboard read and score post |
 | `native/i18n.ts`, `native/style.ts` | `T()` over `lang/strings.js` in the runtime's interface language; the converted style sheet and the theme tokens |
@@ -338,18 +338,21 @@ glowing light-trace frame around the slab, a faint circuit grid on the ground an
 **Particles** are accent-coloured motes rising in a ring around (never over) the board. Ambient
 motion stops under reduced motion. The runtime's Options own the level (Auto from the GPU and a
 benchmark), render scale, pixel-ratio cap, adaptive resolution and the frame-rate limit and readout;
-the game maps each tier to the browser build's preset:
+shadows and their map size, AO, bloom, the grade and anti-aliasing are the level's own
+(`levelSettings()`, the engine's table every StarHermit game reads; the table shows each tier's
+anchor level, and levels above an anchor raise them), except that Low keeps MSAA until engine 1.36.2
+(1.36.1's "off" recolours fog and translucent overlays). The art follows the browser build's preset:
 
 | Tier | Shadows | AO | Bloom | Grade | AA | Reflections | Detail | Particles |
 |---|---|---|---|---|---|---|---|---|
 | Low | off | off | off | off | MSAA | off | plain | off |
-| Balanced | 1024² | off | on | on | FXAA | on | detailed | ⅓ of budget |
-| High | 2048² | on | on | on | SMAA | on | detailed | full budget |
-| Ultra | 4096² | high | on | on | MSAA | on | detailed | full budget |
+| Balanced | 1024² | off | on, ½ res | on | FXAA | on | detailed | ⅓ of budget |
+| High | 2048² | on, ½ res | on, ½ res | on | SMAA | on | detailed | full budget |
+| Ultra | 4096² | full res | on, full res | on | MSAA | on | detailed | full budget |
 
 **Per-tier budgets.** Each tier keeps the browser build's 60 FPS budget; board, tiles, input and
 rules are identical on every tier. The ambient-particle budget scales within a tier by the level
-(×1.64 per level above the tier's first, at most 2×, at most 640).
+(by the level's particle budget over the tier's anchor, at most 2×, at most 640).
 
 | Budget | Low | Balanced | High | Ultra |
 |---|---|---|---|---|
@@ -357,7 +360,6 @@ rules are identical on every tier. The ambient-particle budget scales within a t
 | Tile-number / grid texture | 128 px | 256 px | 256 px | 512 px |
 | Rounded-box segments, tiles (cells/slab one fewer) | 2 | 2 | 4 | 6 |
 | Ambient particles (budget) | 90 | 150 | 220 | 320 |
-| Bloom / AO resolution | ½ | ½ | ½ | full |
 
 The settings sheet's **Graphics** group keeps the game's own choices: the colour **Theme** and
 **3D board (WebGL)** (off: the flat board, nothing 3D renders).

@@ -75,25 +75,10 @@ function button(b: Btn, width: number | null = null): boolean {
   return hit;
 }
 /** Buttons at their own widths in rows that wrap at `width` (CSS flex-wrap). */
-function flow(label: string, list: Btn[], width: number, gap = 10, align: "start" | "center" = "start"): void {
-  const rows = wrapRows(list.map((b) => Math.min(width, btnW(b))), width, gap);
-  let k = 0;
-  ui.column(label, () => {
-    rows.forEach((n, ri) => ui.row(`${label}-r${ri}`, () => {
-      for (let i = 0; i < n; i++, k++) { const b = list[k]!; button(b, btnW(b) > width ? width : null); }
-    }, { spacing: gap, align: "center" }));
-  }, { spacing: gap, align, width });
-}
-function wrapRows(widths: number[], max: number, gap: number): number[] {
-  const rows: number[] = [];
-  let used = 0, n = 0;
-  for (const w of widths) {
-    if (n && used + gap + w > max) { rows.push(n); used = 0; n = 0; }
-    used += (n ? gap : 0) + w;
-    n++;
-  }
-  if (n) rows.push(n);
-  return rows;
+function flow(label: string, list: Btn[], width: number, gap = 10, justify: "start" | "center" = "start"): void {
+  ui.row(label, () => {
+    for (const b of list) button(b, btnW(b) > width ? width : null);
+  }, { wrap: true, width, gap, justify, align: "center" });
 }
 /** Text up to `width` wide: one label when it fits, else a paragraph. */
 function para(text: string, width: number, cls = "p", id?: string, center = false): void {

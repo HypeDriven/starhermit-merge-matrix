@@ -12,9 +12,7 @@
 // pause/settings sheet) and input: the move keys and pad, swipes and drags on
 // the board, and every button.
 import "./i18n.ts";
-import {
-  clipboard, frame, onPreferencesChange, onQuit, onRender, onResume, onStart, onSuspend, onUpdate, preferences,
-} from "starhermit:engine";
+import { clipboard, frame, levelSettings, onPreferencesChange, onQuit, onRender, onResume, onStart, onSuspend, onUpdate, preferences } from "starhermit:engine";
 import { bindings, isKeyDown, onAction, onPointerButton, onPointerMove, onTouch, vibrate } from "starhermit:input";
 import * as ui from "starhermit:ui";
 import { onSessionEnded, requestSignIn } from "starhermit:platform";
@@ -487,10 +485,10 @@ function boardInput(): void {
 let lookKey = "";
 function applyLook(): void {
   const f = frame();
-  const k = `${f.quality}:${f.levelIndex}`;
+  const k = f.level;
   if (k === lookKey) return;
   lookKey = k;
-  render.applyLook(lookFor(f.quality, f.levelIndex));
+  render.applyLook(lookFor(levelSettings(f.level)));
 }
 let themeKey = "";
 function applyThemes(): void {

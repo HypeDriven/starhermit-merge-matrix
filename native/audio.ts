@@ -14,8 +14,9 @@
 // synthesis graph makes clip loads fail on the engine's web runtime. The
 // synthesized stand-ins the browser build played while a sample decoded are
 // not ported, so a sample still loading is silent (its caption still shows).
-// Clips load once the mixer runs (natively at once, in a browser after the
-// first press), one at a time. The pause sheet holds all sound, as the
+// Every clip loads at once in onStart; the rendered clips, ambience and music
+// wait for the mixer (natively at once, in a browser after the first press).
+// The pause sheet holds all sound, as the
 // browser build suspended its audio context there.
 import { context, createClip, loadClip, play as playClip, type AudioClip, type Sound } from "starhermit:audio";
 
@@ -36,24 +37,18 @@ const CAPTIONS: Record<string, string> = {
 };
 
 const clips = new Map<string, AudioClip>();
-const queue: string[] = [];
-let loading = false;
-let wantClips = false;
 let suspended = false;
 let captionFn: ((key: string, vars?: Record<string, string | number>) => void) | null = null;
 
 /** The caption line's listener (English keys and their placeholders, translated where shown). */
 export function onCaption(fn: (key: string, vars?: Record<string, string | number>) => void): void { captionFn = fn; }
 
-function load(name: string): void { if (!queue.includes(name) && !clips.has(name)) queue.push(name); }
-function pump(): void {
-  if (loading || !queue.length) return;
-  const name = queue.shift()!;
-  loading = true;
-  loadClip(`sfx/${name}.opus`).then((c) => { clips.set(name, c); loading = false; }, (e: unknown) => { console.warn(`sfx ${name}: ${String(e)}`); loading = false; });
+/** Loads every clip at once (onStart); a cue whose clip is still loading is skipped. */
+export function loadSfx(): void {
+  for (const name of new Set([...Object.values(SFX), ...MERGE])) {
+    loadClip(`sfx/${name}.opus`).then((c) => { clips.set(name, c); }, (e: unknown) => console.warn(`sfx ${name}: ${String(e)}`));
+  }
 }
-/** Asks for the clips; they load once the mixer runs (see update). */
-export function loadSfx(): void { wantClips = true; }
 /** The pause sheet (and a hidden window) holds all sound. */
 export function setSuspended(on: boolean): void { suspended = on; }
 
@@ -62,7 +57,7 @@ function playSample(file: string): void {
   const clip = clips.get(file);
   if (!clip) return;
   try { playClip(clip, { bus: "effects", gain: LEVEL.effects }); }
-  catch { clips.delete(file); load(file); } // a clip the mixer lost: load it again
+  catch { /* the mixer is full this frame: skip it */ }
 }
 function cue(event: string, vars?: Record<string, string | number>): void {
   const cap = CAPTIONS[event];
@@ -142,17 +137,9 @@ export function start(): void { started = true; }
 /** audio.ts setMusicIntensity: the board's fill (0 empty … 1 full). */
 export function setMusicIntensity(v: number): void { intensity = Math.max(0, Math.min(1, v)); }
 
-/** Each frame: the samples once the mixer runs (one at a time), the rendered clips one a frame after them, then
- * the ambience by state and the music's next step by mixer time. */
+/** Each frame, once the mixer runs: the rendered clips, one a frame, then the ambience by state and the music's next step by mixer time. */
 export function update(): void {
   if (context.state !== "running") return;
-  if (wantClips) {
-    wantClips = false;
-    for (const n of [...Object.values(SFX), ...MERGE]) load(n);
-    return;
-  }
-  pump();
-  if (loading || queue.length) return;
   for (const f of SCALE) if (!notes.has(f)) { notes.set(f, toneClip(f, 0.3, "triangle", 1)); return; }
   if (!low) { low = toneClip(110, 0.5, "sine", 1); return; }
   if (!ambience) { ambience = ambienceSlice(); return; }

@@ -481,14 +481,14 @@ function animateParticles(dt: number): void {
 export function applyLook(next: Look): void {
   if (look && JSON.stringify(look) === JSON.stringify(next)) return;
   look = next;
-  const b = next.budget;
-  renderer.ao = next.ao === "off" ? null : {
-    blendIntensity: 0.75, radius: 0.45, distanceExponent: 1.4, thickness: 1.0, scale: 1.0, samples: next.ao === "high" ? 16 : 8, resolution: b.aoRes,
-    denoise: { lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: next.ao === "high" ? 6 : 4, rings: 2, samples: next.ao === "high" ? 16 : 8, radiusExponent: 2 },
+  const ao = next.ao, fullAo = !!ao && ao.resolution >= 1; // the engine's AoQuality: below 1 = "on", from 1 = "high"
+  renderer.ao = ao && {
+    blendIntensity: 0.75, radius: 0.45, distanceExponent: 1.4, thickness: 1.0, scale: 1.0, samples: ao.samples, resolution: ao.resolution,
+    denoise: { lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: fullAo ? 6 : 4, rings: 2, samples: ao.denoiseSamples, radiusExponent: 2 },
   };
   // HDR threshold above lit-surface levels: only the light-trace frame, the emissive sides of 128+ tiles and hot
   // specular glints bloom.
-  renderer.bloom = next.bloom ? { strength: 0.4, radius: 0.3, threshold: 2.0, resolution: b.bloomRes } : null;
+  renderer.bloom = next.bloom === null ? null : { strength: 0.4, radius: 0.3, threshold: 2.0, resolution: next.bloom };
   // render.ts GradeShader (linear, before the output): a gentle S-curve, a touch more saturation, cool shadows /
   // warm highlights, the 0.24 vignette.
   renderer.grade = next.grade ? {
@@ -499,7 +499,7 @@ export function applyLook(next: Look): void {
   const on = next.shadows > 0;
   renderer.shadowMap.enabled = on;
   key.castShadow = on;
-  if (on) key.shadow.mapSize = next.shadows;
+  if (on) key.shadow.mapSize = next.shadows; // the level's size (minor ≥ 23: the engine keeps what the game sets)
   if (next.reflections && !envTex) {
     try {
       const room = new RoomEnvironment(renderer);

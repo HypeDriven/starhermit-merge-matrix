@@ -1,0 +1,60 @@
+# Bench scene: Journey stage 1, slides through the real keys, tiles and merges in motion.
+# viewport 1366x768@1
+until 300 =Play
+frames 150
+click =Journey
+until 60 Forty stages
+frames 10
+click Stage 1, goal 128
+until 120 Objective
+frames 120
+measure start
+key ArrowLeft 1
+frames 24
+key ArrowDown 1
+frames 24
+key ArrowRight 1
+frames 24
+key ArrowUp 1
+frames 24
+key ArrowLeft 1
+frames 24
+key ArrowDown 1
+frames 24
+key ArrowRight 1
+frames 24
+key ArrowUp 1
+frames 24
+key ArrowLeft 1
+frames 24
+key ArrowDown 1
+frames 24
+key ArrowRight 1
+frames 24
+key ArrowUp 1
+frames 24
+key ArrowLeft 1
+frames 24
+key ArrowDown 1
+frames 24
+key ArrowRight 1
+frames 24
+key ArrowUp 1
+frames 24
+key ArrowLeft 1
+frames 24
+key ArrowDown 1
+frames 24
+key ArrowRight 1
+frames 24
+key ArrowUp 1
+frames 24
+key ArrowLeft 1
+frames 24
+key ArrowDown 1
+frames 24
+key ArrowRight 1
+frames 24
+key ArrowUp 1
+frames 24
+measure stop
