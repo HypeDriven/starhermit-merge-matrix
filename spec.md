@@ -16,7 +16,7 @@ grid can hold — with a seeded board that anyone can replay move for move.
 | Genre | Deterministic slide-and-merge number puzzle (2048 lineage, seeded/verified) |
 | Players | 1, with asynchronous daily comparison |
 | Session length | 3–6 min (lesson or challenge), 8–20 min (2048 practice run) |
-| Platforms | StarHermit engine script game (engine 1.36.2, host API 1.32, `engine.minor=32`): natively in the StarHermit client and in desktop and mobile browsers on the engine's web runtime; portrait and landscape |
+| Platforms | StarHermit engine script game (engine 1.38.0, host API 1.38, `engine.minor=38`): natively in the StarHermit client and in desktop and mobile browsers on the engine's web runtime; portrait and landscape |
 | Rendering | `starhermit:scene` (three.js r185 parity) 3D board drawn into the playfield between the `starhermit:ui` top bar and rails; a flat board drawn in the UI when the 3D board is switched off |
 | Build | TypeScript run directly by the runtime (`engine.entry=native/main.ts`); `tsc --noEmit` type-checks against `.starhermit/starhermit.d.ts`; `npm run package` writes the web loader `index.html` and `starhermit-files.json` |
 
@@ -340,8 +340,8 @@ motion stops under reduced motion. The runtime's Options own the level (Auto fro
 benchmark), render scale, pixel-ratio cap, adaptive resolution and the frame-rate limit and readout;
 shadows and their map size, AO, bloom, the grade and anti-aliasing are the level's own
 (`levelSettings()`, the engine's table every StarHermit game reads; the table shows each tier's
-anchor level, and levels above an anchor raise them), except that Low keeps MSAA until engine 1.36.2
-(1.36.2's "off" recolours fog and translucent overlays). The art follows the browser build's preset:
+anchor level, and levels above an anchor raise them), except that Low keeps MSAA until engine 1.38.0
+(1.38.0's "off" recolours fog and translucent overlays). The art follows the browser build's preset:
 
 | Tier | Shadows | AO | Bloom | Grade | AA | Reflections | Detail | Particles |
 |---|---|---|---|---|---|---|---|---|
@@ -474,7 +474,7 @@ second row rather than clipping, and nothing is sized to a fixed English string.
 ## 12. StarHermit integration
 
 `starhermit.txt` declares the engine (`engine.api=1`, `engine.entry=native/main.ts`,
-`engine.version=1.36.2`, `engine.minor=32`, capabilities platform, storage, clipboard),
+`engine.version=1.38.0`, `engine.minor=38`, capabilities platform, storage, clipboard),
 `launch=index.html` (the web loader), `server=score-script.js`, `cover=cover.jpg`, the owner id, the
 seven actions (`control.*` with their default keys, grouped) and their pad defaults
 (`engine.gamepad.*`). All platform features go through the runtime (`starhermit:platform`,
