@@ -1,15 +1,15 @@
 // Localization coverage: every English key the engine client and the pure
 // content use (T('…'), N('…')) is translated in every locale (en-GB → en-US,
 // es-ES → es-419, fr-CA → fr-FR inherit), placeholders survive, no table row
-// is unused, and the StarHermit account strings cover the nine locales.
+// is unused (assets/strings.json).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
-import { loadTables, codeKeys, audit, LOCALES } from './i18n-common.mjs';
+import { codeKeys, audit } from './i18n-common.mjs';
 
 const ROOT = new URL('../', import.meta.url);
 const read = (p) => readFileSync(new URL(p, ROOT), 'utf8');
-const tables = loadTables(ROOT, 'lang/strings.js', 'MM_STRINGS');
+const tables = JSON.parse(read('assets/strings.json'));
 
 function usedKeys() {
   const keys = new Set();
@@ -36,10 +36,4 @@ test('regional tables inherit and override', () => {
   assert.equal(tables['fr-CA'].Score, 'Pointage');
   assert.equal(tables['es-ES'].Settings, 'Ajustes');
   assert.equal(tables['es-419']['Reach a {n} block.'], 'Alcanza un bloque de {n}.');
-});
-
-test('StarHermit account strings cover all nine locales', async () => {
-  const { SH_STRINGS } = await import('../src/sh-strings.ts');
-  const keys = Object.keys(SH_STRINGS['en-US']);
-  for (const l of LOCALES) for (const k of keys) assert.ok(SH_STRINGS[l]?.[k], `${l} ${k}`);
 });

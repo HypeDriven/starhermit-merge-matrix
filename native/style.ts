@@ -32,7 +32,7 @@ export function initStyles(): void {
       text: { color: "$text" }, minHeight: 44,
       parts: { box: { background: "$panel2", border: { width: 2, color: "$muted" }, radius: 4 }, mark: { background: "$accent" } },
     },
-    select: { background: "$panel2", border: { width: 1, color: "$panel2" }, radius: 8, text: { color: "$text" }, minHeight: 40 },
+    select: { background: "$panel2", border: { width: 1, color: "$panel2" }, radius: 8, text: { color: "$text" } },
     scrollArea: { parts: { bar: { background: "#9aa7c466", radius: 4 } } },
     tooltip: { background: "$panel", text: { color: "$text" }, radius: 6, padding: 6 },
   });

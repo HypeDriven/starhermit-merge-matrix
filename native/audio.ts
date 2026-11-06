@@ -9,16 +9,14 @@
 // volumes and the mute): music → "music", effects → "effects", the ambience
 // plays on "music" (the runtime has no ambience bus); the old default bus
 // levels (music 50 % × 0.5, effects 80 %, ambience 40 % × 0.35) are folded into
-// each sound's gain. The music notes and the ambience loop are rendered into
-// clips (createClip; the 14 s ambience in slices over several frames): a live
-// synthesis graph makes clip loads fail on the engine's web runtime. The
-// synthesized stand-ins the browser build played while a sample decoded are
+// each sound's gain. The music notes and the ambience loop are rendered offline
+// once at start (OfflineAudioContext). The synthesized stand-ins the browser build played while a sample decoded are
 // not ported, so a sample still loading is silent (its caption still shows).
-// Every clip loads at once in onStart; the rendered clips, ambience and music
+// Every clip loads at once in onStart; the ambience and music
 // wait for the mixer (natively at once, in a browser after the first press).
 // The pause sheet holds all sound, as the
 // browser build suspended its audio context there.
-import { context, createClip, loadClip, play as playClip, type AudioClip, type Sound } from "starhermit:audio";
+import { context, createClip, loadClip, OfflineAudioContext, play as playClip, type AudioClip, type Sound } from "starhermit:audio";
 
 /** Marks an English caption key (translated where shown). */
 const N = (key: string): string => key;
@@ -48,6 +46,7 @@ export function loadSfx(): void {
   for (const name of new Set([...Object.values(SFX), ...MERGE])) {
     loadClip(`sfx/${name}.opus`).then((c) => { clips.set(name, c); }, (e: unknown) => console.warn(`sfx ${name}: ${String(e)}`));
   }
+  renderClips();
 }
 /** The pause sheet (and a hidden window) holds all sound. */
 export function setSuspended(on: boolean): void { suspended = on; }
@@ -88,37 +87,43 @@ export const sfx = {
 // -- rendered clips ------------------------------------------------------------------------------
 const RATE = 22050;
 /** audio.ts tone(): a 8 ms rise to `gain`, then an exponential fall to 0.0001 over `dur`. */
-function toneClip(freq: number, dur: number, type: "sine" | "triangle", gain: number): AudioClip {
-  const n = Math.round((dur + 0.05) * RATE);
-  const out = new Float32Array(n);
-  for (let i = 0; i < n; i++) {
-    const t = i / RATE;
-    const ph = (t * freq) % 1;
-    const w = type === "sine" ? Math.sin(2 * Math.PI * ph) : 1 - 4 * Math.abs(ph - 0.5);
-    const env = t < 0.008 ? 0.0001 * Math.pow(gain / 0.0001, t / 0.008) : t < dur ? gain * Math.pow(0.0001 / gain, (t - 0.008) / (dur - 0.008)) : 0;
-    out[i] = w * env;
-  }
-  return createClip([out], RATE);
+async function toneClip(freq: number, dur: number, type: "sine" | "triangle", gain: number): Promise<AudioClip> {
+  const off = new OfflineAudioContext(1, Math.round((dur + 0.05) * RATE), RATE);
+  const osc = off.createOscillator();
+  osc.type = type;
+  osc.frequency.value = freq;
+  const g = off.createGain();
+  g.gain.setValueAtTime(0.0001, 0);
+  g.gain.exponentialRampToValueAtTime(gain, 0.008);
+  g.gain.exponentialRampToValueAtTime(0.0001, dur);
+  osc.connect(g).connect(off.destination);
+  osc.start();
+  osc.stop(dur);
+  return createClip(await off.startRendering());
 }
 /** audio.ts startAmbience: 55 + 82.5 Hz sines at 0.5, the sum's gain swung ±0.25 by a slow LFO (0.07 Hz; here
- * 1/14 Hz so the 14 s loop is seamless). Rendered at 11025 Hz in slices of 22050 samples a frame. */
+ * 1/14 Hz so the 14 s loop is seamless). Rendered at 11025 Hz. */
 const AMB_RATE = 11025, AMB_SECONDS = 14;
-let ambData: Float32Array | null = null;
-let ambDone = 0;
-function ambienceSlice(): AudioClip | null {
-  const n = AMB_RATE * AMB_SECONDS;
-  if (!ambData) ambData = new Float32Array(n);
-  const end = Math.min(n, ambDone + 22050);
-  for (let i = ambDone; i < end; i++) {
-    const t = i / AMB_RATE;
-    const g = 0.5 + 0.25 * Math.sin(2 * Math.PI * t / AMB_SECONDS);
-    ambData[i] = (Math.sin(2 * Math.PI * 55 * t) + Math.sin(2 * Math.PI * 82.5 * t)) * g * 0.5;
+async function ambienceClip(): Promise<AudioClip> {
+  const off = new OfflineAudioContext(1, AMB_RATE * AMB_SECONDS, AMB_RATE);
+  const swell = off.createGain();
+  swell.gain.value = 0.5;
+  const lfo = off.createOscillator();
+  lfo.frequency.value = 1 / AMB_SECONDS;
+  const depth = off.createGain();
+  depth.gain.value = 0.25;
+  lfo.connect(depth).connect(swell.gain);
+  const mix = off.createGain();
+  mix.gain.value = 0.5;
+  swell.connect(mix).connect(off.destination);
+  for (const f of [55, 82.5]) {
+    const osc = off.createOscillator();
+    osc.frequency.value = f;
+    osc.connect(swell);
+    osc.start();
   }
-  ambDone = end;
-  if (ambDone < n) return null;
-  const clip = createClip([ambData], AMB_RATE);
-  ambData = null;
-  return clip;
+  lfo.start();
+  return createClip(await off.startRendering());
 }
 
 // -- music and ambience ----------------------------------------------------------------------------
@@ -132,17 +137,22 @@ let musicStep = 0;
 let nextStep = 0;
 let intensity = 0; // 0 calm, 1 tense: the adaptive layer
 
+/** Renders the notes and the ambience, one context a clip (onStart). */
+function renderClips(): void {
+  const warn = (e: unknown): void => console.warn(`audio: ${String(e)}`);
+  for (const f of SCALE) toneClip(f, 0.3, "triangle", 1).then((c) => { notes.set(f, c); }, warn);
+  toneClip(110, 0.5, "sine", 1).then((c) => { low = c; }, warn);
+  ambienceClip().then((c) => { ambience = c; }, warn);
+}
+
 /** Ambience and music run from the first press on (audio.ts ensureAudio; natively from the start). */
 export function start(): void { started = true; }
 /** audio.ts setMusicIntensity: the board's fill (0 empty … 1 full). */
 export function setMusicIntensity(v: number): void { intensity = Math.max(0, Math.min(1, v)); }
 
-/** Each frame, once the mixer runs: the rendered clips, one a frame, then the ambience by state and the music's next step by mixer time. */
+/** Each frame, once the mixer runs and the clips are rendered: the ambience by state and the music's next step by mixer time. */
 export function update(): void {
-  if (context.state !== "running") return;
-  for (const f of SCALE) if (!notes.has(f)) { notes.set(f, toneClip(f, 0.3, "triangle", 1)); return; }
-  if (!low) { low = toneClip(110, 0.5, "sine", 1); return; }
-  if (!ambience) { ambience = ambienceSlice(); return; }
+  if (context.state !== "running" || notes.size < SCALE.length || !low || !ambience) return;
   const want = started && !suspended;
   try {
     if (want && !ambSound) ambSound = playClip(ambience, { bus: "music", gain: LEVEL.ambience, loop: true });

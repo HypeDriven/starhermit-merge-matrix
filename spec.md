@@ -32,13 +32,12 @@ grid can hold — with a seeded board that anyone can replay move for move.
 | `native/quality.ts` | The engine-owned effects from `levelSettings()`; the old art presets and budgets keyed by the level's tier |
 | `native/audio.ts` | Authored clips per event, rendered music notes and ambience loop, captions |
 | `native/platform.ts` | Save (`saves`) with foreign-save migration and conflict merge, device snapshot, game options (`settings`) with legacy-KV migration, player, invite, platform clock, leaderboard read and score post |
-| `native/i18n.ts`, `native/style.ts` | `T()` over `lang/strings.js` in the runtime's interface language; the converted style sheet and the theme tokens |
+| `native/i18n.ts`, `native/style.ts` | `T()` over `assets/strings.json` in the runtime's interface language; the converted style sheet and the theme tokens |
 | `src/rules.ts` | Pure rules engine: board, slide/merge, scoring, RNG, undo, replay envelope, daily seed (unchanged from the browser build) |
 | `src/content.ts` | Versioned content: 5 themes, 3 lessons, 40 journey stages, 5 achievements, offline stage validator |
 | `src/modes.ts` | Practice/Challenge/Score chase/Daily options, the hint, board counts, the move diff |
 | `src/progress.ts` | Progress record, merge, save document, foreign-save and legacy-option readers, snapshot check, achievements |
-| `src/sh-strings.ts` | Account strings (sign-in, invite, toasts, the results leaderboard line) in the nine locales |
-| `lang/strings.js` | Translation tables (English keys, nine locales), a classic script the engine loads with `loadClassic` |
+| `assets/strings.json` | Translation tables (English keys, nine locales) the engine loads with `strings.load`; account lines are the engine's `starhermit.*` |
 | `assets/ui-style.json` | The UI styles, converted from `tools/ui-style.css` by `npm run css` (`starhermit css`) |
 | `score-script.js` | StarHermit platform script (`server=`): range-checks a ranked run's total and posts it to the `high-score` leaderboard |
 | `server.js` | Local static host from the browser build (not part of the package); its legacy `/api/v1` routes are not called |
@@ -340,12 +339,11 @@ motion stops under reduced motion. The runtime's Options own the level (Auto fro
 benchmark), render scale, pixel-ratio cap, adaptive resolution and the frame-rate limit and readout;
 shadows and their map size, AO, bloom, the grade and anti-aliasing are the level's own
 (`levelSettings()`, the engine's table every StarHermit game reads; the table shows each tier's
-anchor level, and levels above an anchor raise them), except that Low keeps MSAA until engine 1.38.0
-(1.38.0's "off" recolours fog and translucent overlays). The art follows the browser build's preset:
+anchor level, and levels above an anchor raise them). The art follows the browser build's preset:
 
 | Tier | Shadows | AO | Bloom | Grade | AA | Reflections | Detail | Particles |
 |---|---|---|---|---|---|---|---|---|
-| Low | off | off | off | off | MSAA | off | plain | off |
+| Low | off | off | off | off | off | off | plain | off |
 | Balanced | 1024² | off | on, ½ res | on | FXAA | on | detailed | ⅓ of budget |
 | High | 2048² | on, ½ res | on, ½ res | on | SMAA | on | detailed | full budget |
 | Ultra | 4096² | full res | on, full res | on | MSAA | on | detailed | full budget |
@@ -396,7 +394,7 @@ sound's gain.
 fourth step; the board's occupancy (`1 − empties/cells`) drives it every frame, and above 0.6 the
 pulse plays on every step instead of every other one — the score tightens as the matrix fills.
 Ambience is a 55 Hz/82.5 Hz drone swelling with a slow LFO (a seamless 14 s loop). Notes and the
-loop are rendered into clips (`createClip`) once; the browser build's synthesized fallbacks for
+loop are rendered offline into clips once at start; the browser build's synthesized fallbacks for
 loading samples are not ported.
 
 ### SFX event table (source for `sfx/manifest.txt`)
@@ -432,10 +430,10 @@ string (title, modes and setup, journey grid labels, lessons, HUD, objective, hi
 undo messages, results, help, settings sheet, theme and achievement names, sync status, captions) ships
 in all nine. Tile values and seeds are plain digits.
 
-**Where strings live:** `lang/strings.js` holds the tables keyed by the English source text (en-GB,
-es-ES and fr-CA list only their differences — *Ajustes*, *pointage*); `native/i18n.ts` loads it as a
-classic script and looks keys up through the regional parents. `src/content.ts` and `src/modes.ts` mark
-theme, lesson, achievement and option texts as keys; the account strings (`src/sh-strings.ts`) follow
+**Where strings live:** `assets/strings.json` holds the tables keyed by the English source text (en-GB,
+es-ES and fr-CA list only their differences — *Ajustes*, *pointage*); `native/i18n.ts` loads it into the
+engine's `strings`, which follows the regional chain. `src/content.ts` and `src/modes.ts` mark
+theme, lesson, achievement and option texts as keys; the account strings (the engine's `starhermit.*`) follow
 the same language. "Merge Matrix" and "StarHermit" stay untranslated.
 
 **Language:** the runtime's interface language (Options › Language: the player's choice, else the
@@ -492,7 +490,7 @@ seven actions (`control.*` with their default keys, grouped) and their pad defau
 | Leaderboards | Signed in, every finished ranked run (Daily and Score chase) posts its total through `score-script.js` (a practice session whose socket carries `{ type: 'result', scores: { 'high-score': total } }`; the script range-checks it, 0–1,000,000, and posts it to the `high-score` board) and the results show "Leaderboard rank: #N" (or posted / not posted). The Daily rail lists the board's top ten; without a board or offline it shows the local personal best. Results come only from the server script; the client never writes a board. |
 | Achievements | Evaluated in the game and kept in the save (five definitions in `content.ts`). |
 
-Account strings are localized in the nine locales (`src/sh-strings.ts`).
+Account strings are the engine's, in the nine locales.
 
 Not used: matchmaking, chat, replays, presence, multiplayer, purchases and platform achievements —
 Merge Matrix is single-player; the only platform session is the one-message practice session that

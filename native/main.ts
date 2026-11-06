@@ -13,7 +13,7 @@
 // the board, and every button.
 import "./i18n.ts";
 import { clipboard, frame, levelSettings, onPreferencesChange, onQuit, onRender, onResume, onStart, onSuspend, onUpdate, preferences } from "starhermit:engine";
-import { bindings, isKeyDown, onAction, onPointerButton, onPointerMove, onTouch, vibrate } from "starhermit:input";
+import { bindings, onAction, onPointerButton, onPointerMove, onTouch, vibrate } from "starhermit:input";
 import * as ui from "starhermit:ui";
 import { onSessionEnded, requestSignIn } from "starhermit:platform";
 import * as rules from "../src/rules.ts";
@@ -44,7 +44,6 @@ export const app = {
   practiceGoal: 2,
   practiceSize: 0,
   challenge: 0,
-  toast: null as null | { text: Text; until: number },
   caption: null as null | { text: string; until: number },
   hint: null as Text | null,
   invalid: null as Text | null,
@@ -79,7 +78,12 @@ function opened(focus: string | null): void {
 }
 export const fresh = (n = 1): boolean => frame().frame - app.openedFrame <= n;
 export function announce(text: string): void { if (text) ui.announce(text.slice(0, 480)); }
-export function toast(text: Text): void { app.toast = { text, until: now() + 3.2 }; }
+let toastNow: ui.Toast | null = null;
+/** One at a time, as the old pill (a new one replaces it); a press still reaches the board. */
+export function toast(text: Text): void {
+  toastNow?.dismiss();
+  toastNow = ui.toast!(text(), { duration: 3.2, style: "toast", dismissible: false });
+}
 
 // ------------------------------------------------------------------ keys
 const KEY_GLYPHS: Record<string, string> = { "Arrow Up": "↑", "Arrow Down": "↓", "Arrow Left": "←", "Arrow Right": "→", Escape: "Esc" };
@@ -317,7 +321,7 @@ export function resultsHeadline(): string {
 export function lbLine(): string | null {
   const r = app.lbResult;
   if (r === undefined) return null;
-  return !r ? account().lbPosting : !r.posted ? account().lbNotPosted : r.rank ? account().lbRank.replace("{rank}", String(r.rank)) : account().lbPosted;
+  return !r ? account("leaderboardPosting") : !r.posted ? account("leaderboardNotPosted") : r.rank ? account("leaderboardRank", { rank: r.rank }) : account("leaderboardPosted");
 }
 
 function loadLeaderboard(): void {
@@ -407,7 +411,7 @@ export function copyInvite(): void {
   if (!link) return;
   let ok = false;
   try { clipboard.writeText(link); ok = true; } catch { ok = false; }
-  toast(ok ? () => account().copied : () => account().copyFailed);
+  toast(ok ? () => account("inviteCopied") : () => account("inviteFailed"));
 }
 
 // ------------------------------------------------------------------ input
@@ -423,7 +427,7 @@ onAction((e) => {
     return;
   }
   if (!canMove()) return;
-  if (e.source === "keyboard" && ui.focused() !== null && ARROWS.some((k) => isKeyDown(k))) return;
+  if (e.source === "keyboard" && ui.focused() !== null && ARROWS.includes(e.code ?? "")) return;
   switch (e.action) {
     case "up": case "down": case "left": case "right": doMove(e.action); break;
     case "undo": doUndo(); break;
@@ -517,7 +521,7 @@ platform.onOptionsChange(() => {
 });
 platform.onMerged(() => { /* the screens read platform.progress each frame */ });
 onPreferencesChange((p) => render.setReducedMotion(p.reducedMotion));
-onSessionEnded(() => toast(() => account().signedOut));
+onSessionEnded(() => toast(() => account("signedOut")));
 // A hidden window pauses a run (main.ts visibilitychange) and holds the sound.
 onSuspend(() => {
   if (app.screen === "play" && run.state && !app.sheet) openSheet();
@@ -535,7 +539,6 @@ onUpdate((dt) => {
   applyThemes();
   audio.update();
   const t = now();
-  if (app.toast && app.toast.until < t) app.toast = null;
   if (app.caption && app.caption.until < t) app.caption = null;
   const st = run.state;
   if (app.screen === "play" && st) {

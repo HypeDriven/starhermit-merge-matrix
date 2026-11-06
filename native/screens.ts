@@ -4,7 +4,7 @@
 // art, modes with the setup panel, journey, learn, results over the backdrop,
 // how to play), the play layout (the objective rail, the board, the action
 // rail with the hint, warning and Daily leaderboard panels, the countdown),
-// the pause/settings sheet, the caption line and the toast. The browser's
+// the pause/settings sheet and the caption line. The browser's
 // media queries are layouts picked by the window's logical size: desktop
 // (≥ 1024 px: rails at the sides), compact (rails above and below the board)
 // and landscape phone (narrow rails at the sides).
@@ -28,9 +28,9 @@ import {
 interface Layout { lw: number; lh: number; sc: number; ox: number; oy: number; desktop: boolean; landscape: boolean }
 function layoutNow(): Layout {
   const f = frame();
-  const sc = ui.preferences().scale;
-  const sa = f.safeArea;
-  const lw = Math.max(1, (f.width - sa.left - sa.right) / sc), lh = Math.max(1, (f.height - sa.top - sa.bottom) / sc);
+  const v = ui.viewport!();
+  const sa = f.safeArea; // window pixels: the 3D viewport's offset
+  const sc = v.scale, lw = Math.max(1, v.width), lh = Math.max(1, v.height);
   const landscape = lw < 1024 && lw > lh;
   return { lw, lh, sc, ox: sa.left, oy: sa.top, desktop: lw >= 1024, landscape };
 }
@@ -126,7 +126,6 @@ export function drawScreens(): void {
   }
   if (app.sheet) sheet(L);
   caption(L);
-  toast(L);
   if (app.focusNext) {
     const age = f.frame - app.openedFrame;
     const target = app.focusNext === "first" ? firstId : app.focusNext;
@@ -243,8 +242,8 @@ function titleScreen(w: number): void {
     { id: "btn-learn", text: T("Learn"), act: () => goTo("learn") },
     { id: "btn-help", text: T("How to play"), act: () => goTo("help") },
   );
-  if (!platform.signedIn()) list.push({ id: "btn-signin", text: account().signIn, act: signIn });
-  if (platform.inviteLink()) list.push({ id: "btn-invite", text: account().invite, act: copyInvite });
+  if (!platform.signedIn()) list.push({ id: "btn-signin", text: account("signIn"), act: signIn });
+  if (platform.inviteLink()) list.push({ id: "btn-invite", text: account("invite"), act: copyInvite });
   ui.row("menu-row", () => {
     ui.id("menu").column(T("Main"), () => { for (const b of list) button(b, mw); }, { width: mw, spacing: 8, align: "center" });
   }, { width: w, justify: "center" });
@@ -632,7 +631,7 @@ function checks(w: number, list: [keyof platform.Options, string][]): void {
   }, { spacing: 2, width: w });
 }
 
-// ------------------------------------------------------------------ caption and toast
+// ------------------------------------------------------------------ caption
 function caption(L: Layout): void {
   const c = app.caption;
   if (!c) return;
@@ -640,12 +639,5 @@ function caption(L: Layout): void {
   const w = Math.min(L.lw - 32, tw(text, "caption-text") + 28);
   ui.place("caption-line", { anchor: "bottom", y: 8 }, () =>
     ui.style("caption", { width: w }).row("caption-row", () => para(text, w - 26, "caption-text", "caption-text", true), { width: w, align: "center" }));
-}
-function toast(L: Layout): void {
-  const t = app.toast;
-  if (!t) return;
-  const text = t.text();
-  const w = Math.min(L.lw * 0.92, 420);
-  ui.place("toast", { anchor: "bottom", y: 16 }, () => ui.style("toast", { width: w }).column("toast-col", () => para(text, w - 34, "p", "sh-toast", true), { width: w, align: "center" }));
 }
 
