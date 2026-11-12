@@ -13,7 +13,7 @@ const tables = JSON.parse(read('assets/strings.json'));
 
 function usedKeys() {
   const keys = new Set();
-  const files = [...readdirSync(new URL('native/', ROOT)).map((f) => `native/${f}`), 'src/content.ts', 'src/modes.ts'];
+  const files = [...readdirSync(new URL('native/', ROOT), { withFileTypes: true }).filter((entry) => entry.isFile() && entry.name.endsWith('.ts')).map((entry) => `native/${entry.name}`), 'src/content.ts', 'src/modes.ts'];
   for (const f of files) for (const k of codeKeys(read(f))) keys.add(k);
   return [...keys].sort();
 }

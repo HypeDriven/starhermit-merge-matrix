@@ -1,3 +1,5 @@
+// localization-runtime:attached
+import { localizedCanvasFont as __l10nCanvasFont } from "./l10n/font.ts";
 // The 3D board on starhermit:scene, as the browser build's src/render.ts drew
 // it with three.js r183: the board slab and its cells (an InstancedMesh), a
 // tile per block (a box, or a bevelled rounded box with clear coat on
@@ -175,7 +177,7 @@ function labelTexture(v: number): Texture {
     g.strokeStyle = "rgba(0,0,0,0.16)";
     g.beginPath(); g.moveTo(242, 14); g.lineTo(242, 242); g.lineTo(14, 242); g.stroke();
   }
-  g.font = `800 ${v >= 1000 ? 76 : v >= 100 ? 92 : 116}px sans-serif`;
+  g.font = __l10nCanvasFont(`800 ${v >= 1000 ? 76 : v >= 100 ? 92 : 116}px sans-serif`);
   g.textAlign = "center";
   g.textBaseline = "middle";
   if (detailed()) {
