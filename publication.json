@@ -1,0 +1,103 @@
+{
+  "game": {
+    "id": "a4a82342-7b99-45eb-a9e1-aeae4fbb0168",
+    "displayName": "Merge Matrix",
+    "hosting": {
+      "hostingEnabled": true,
+      "hostedUrl": "https://a4a82342-7b99-45eb-a9e1-aeae4fbb0168.starhermit.com/index.html",
+      "deployStatus": "live",
+      "pinnedCommitSha": null,
+      "deployedCommitSha": null,
+      "deployError": null,
+      "deployedAt": "2026-11-12T08:15:47.137538+00:00",
+      "externalLaunchUrl": null,
+      "engineVersion": "1.38.0",
+      "deployWarning": null
+    }
+  },
+  "publishedAt": "2026-11-12T08:15:52.080Z",
+  "sourceCommit": "370fb34e25f7f4f7653d04be92725f83752e3692",
+  "bytesReceived": 1521488,
+  "archiveSha256": "9eaa52233f786548794f0eb2fd44da7db74b942721cd9345cbb95da0e4d28974",
+  "indexSha256": "9e8651ade9f46542005fdedc0f598626303b56f0825b0ad76cd9e6e3650a778a",
+  "result": {
+    "clientPublished": true,
+    "serverImageLoaded": false,
+    "imageDigest": null,
+    "bytesReceived": 1521488,
+    "mode": "replace",
+    "filesRemoved": 0,
+    "engineVersion": "1.38.0",
+    "deployWarning": null
+  },
+  "liveVerification": {
+    "at": "2026-11-12T08:15:52.080Z",
+    "files": [
+      {
+        "file": "starhermit-files.json",
+        "sha256": "9e8651ade9f46542005fdedc0f598626303b56f0825b0ad76cd9e6e3650a778a",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/Hebrew.ttf",
+        "sha256": "ad79395de3a9cfbefa524fda0bcc8d8170ab1f24dcb041662c03298679a11bcd",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/Japanese.otf",
+        "sha256": "3c6f31a450c51a86645d6efaba013c05d0faca4c44c1fd46a7f8e21973334e29",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/Khmer.ttf",
+        "sha256": "f66a38c4b34533b0bc290febb76584eb08d3b30fcd7d293e87738989cb404dfe",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/SimplifiedChinese.otf",
+        "sha256": "0db3a41a4315720657ca3a23dc463ea5bf8c52cb1f0c746759fdcdb7f8c8ca72",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/Tamil.ttf",
+        "sha256": "2e80bdaf72e1a78a48f258cdf0074c717c6012d944d912d8ef59efc4891b7e7a",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/TraditionalChinese.otf",
+        "sha256": "3256b130bae490c6c408b6a715401b661b2c89455fa6f25117a2ac2b3f3b0a25",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/common.json",
+        "sha256": "8ed9cef52b40ba8d9701099c97057879821aa20aa66717bb2972f27a788ca265",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/fonts.json",
+        "sha256": "37beaea0dba54c9f2c45995cbf9fd19fad21719d701718c41d7e58dd7748ca13",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/locales.json",
+        "sha256": "52ae79df9ddd711ea212ae4a5b9739aba2441f567f1f1a34855486d32dea827f",
+        "status": 200
+      },
+      {
+        "file": "assets/strings.json",
+        "sha256": "cdd7cdce8c347623b44dbde758337fa98e54cdef552df73cdfd2e648e2f41e32",
+        "status": 200
+      },
+      {
+        "file": "index.html",
+        "sha256": "832f672083c741b0daa9874d94fea974703e4d8fd857d4da8ebe0381bffff605",
+        "status": 200
+      },
+      {
+        "file": "starhermit.txt",
+        "sha256": "4e07c8df31c09d57e6dcaa445b86dfa049f575051243a0a9eda7028ed69a9198",
+        "status": 200
+      }
+    ]
+  }
+}
