@@ -1,3 +1,4 @@
+import { bindings } from "starhermit:input";
 import { localizedStyle as __l10nStyle } from "./l10n/font.ts";
 import { localizedDrawOptions as __l10nDrawOptions } from "./l10n/font.ts";
 // localization-runtime:attached
@@ -124,7 +125,7 @@ function inkColor(): string { const t = themeNow(); return t.id === "mono" ? "#f
 function accentColor(): string { const t = themeNow(); return t.id === "mono" ? "#ffdf00" : t.accent; }
 
 // ------------------------------------------------------------------ the frame
-export function drawScreens(): void {
+function drawScreensImmediate(): void {
   const L = layoutNow();
   const f = frame();
   firstId = null;
@@ -655,3 +656,10 @@ function caption(L: Layout): void {
     ui.style(__l10nStyle("caption"), __l10nStyle({ width: w })).row("caption-row", () => para(text, w - 26, "caption-text", "caption-text", true), { width: w, align: "center" }));
 }
 
+
+export function drawScreens(): void {
+  if (app.screen !== "help") { drawScreensImmediate(); return; }
+  const actions = ["up","down","left","right","undo","hint","pause"];
+  const version = JSON.stringify([(app as any).settings ?? (app as any).options ?? {}, (platform as any).options ?? {}, actions.map((action) => bindings(action))]);
+  ui.retain!("help-screen", version, drawScreensImmediate);
+}

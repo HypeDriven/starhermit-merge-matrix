@@ -16,7 +16,7 @@ grid can hold — with a seeded board that anyone can replay move for move.
 | Genre | Deterministic slide-and-merge number puzzle (2048 lineage, seeded/verified) |
 | Players | 1, with asynchronous daily comparison |
 | Session length | 3–6 min (lesson or challenge), 8–20 min (2048 practice run) |
-| Platforms | StarHermit engine script game (engine 1.39.0, host API 1.39, `engine.minor=39`): natively in the StarHermit client and in desktop and mobile browsers on the engine's web runtime; portrait and landscape |
+| Platforms | StarHermit engine script game (engine 1.44.1, host API 1.44, `engine.minor=44`): natively in the StarHermit client and in desktop and mobile browsers on the engine's web runtime; portrait and landscape |
 | Rendering | `starhermit:scene` (three.js r185 parity) 3D board drawn into the playfield between the `starhermit:ui` top bar and rails; a flat board drawn in the UI when the 3D board is switched off |
 | Build | TypeScript run directly by the runtime (`engine.entry=native/main.ts`); `tsc --noEmit` type-checks against `.starhermit/starhermit.d.ts`; `npm run package` writes the web loader `index.html` and `starhermit-files.json` |
 
@@ -472,7 +472,7 @@ second row rather than clipping, and nothing is sized to a fixed English string.
 ## 12. StarHermit integration
 
 `starhermit.txt` declares the engine (`engine.api=1`, `engine.entry=native/main.ts`,
-`engine.version=1.39.0`, `engine.minor=39`, capabilities platform, storage, clipboard),
+`engine.version=1.44.1`, `engine.minor=44`, capabilities platform, storage, clipboard),
 `launch=index.html` (the web loader), `server=score-script.js`, `cover=cover.jpg`, the owner id, the
 seven actions (`control.*` with their default keys, grouped) and their pad defaults
 (`engine.gamepad.*`). All platform features go through the runtime (`starhermit:platform`,
@@ -619,3 +619,9 @@ generated label textures, and the game has no characters.
 The string tables include complete regional variants for `fr-BE`, `de-BE`, `en-SG`, `en-HK`, `en-BQ`, `es-CO`, `de-IT`, `fr-IT`, `es-CL`, `es-AR`, `es-EC`, `de-BR`. These reuse the corresponding existing translations in their language family. The runtime can resolve the exact regional tag. Language selection is available from the game’s Options panel or F2 and is saved per player in `ui.language`. Changes apply during play. Additional national, regional and indigenous language packs are only shipped once every English message has a translation with intact placeholders and markup. Complete additional language tables: `ja-JP`, `nl-BE`, `zh-SG`, `ms-SG`, `ta-SG`, `zh-HK`, `yue-HK`, `nl-NL`, `fi-FI`, `sv-FI`, `et-EE`, `id-ID`, `vi-VN`, `da-DE`, `lb-BE`, `co-FR`, `eu-FR`, `ca-FR`, `oc-FR`, `sl-IT`, `fur-IT`, `ca-IT`, `oc-IT`, `ca-ES`, `eu-ES`, `gl-ES`, `su-ID`, `bew-ID`, `km-VN`, `ru-FI`, `ru-EE`.
 
 <!-- regional-localization:end -->
+
+## Engine 1.44.1
+
+Browser play uses the WebGPU-only StarHermit 1.44.1 web runtime. Automatic ray-traced shadows are enabled on supported Vulkan devices, with mapped-shadow fallbacks elsewhere. Packaging creates block-compressed runtime textures and compressed glTF copies, retaining original image fallbacks.
+
+The help screen replays through retained native UI while its contents, options, layout and key bindings are unchanged.
