@@ -498,6 +498,7 @@ export function applyLook(next: Look): void {
     vignette: { amount: 0.24, inner: 0.35, outer: 0.85 },
   } : null;
   renderer.antialias = next.antialias;
+  renderer.motionBlur = next.bloom !== null ? { intensity: 0.25, samples: 8, maxPixels: 16, targetFps: 60, camera: false } : null;
   const on = next.shadows > 0;
   renderer.shadowMap.enabled = on;
   key.castShadow = on;
