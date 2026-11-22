@@ -12,7 +12,7 @@
     "metadataSource": "starhermit.txt",
     "createdAt": "2026-09-01T07:01:04.265524+00:00",
     "coverArtSource": "manifest",
-    "coverArtUpdatedAt": "2026-11-18T17:52:02.770673+00:00",
+    "coverArtUpdatedAt": "2026-11-22T14:25:24.993033+00:00",
     "submittedByUserId": "2712e04e-461b-4d23-81ae-e40b429128a8",
     "submittedByUsername": "starhermit",
     "hosting": {
@@ -22,9 +22,9 @@
       "pinnedCommitSha": null,
       "deployedCommitSha": null,
       "deployError": null,
-      "deployedAt": "2026-11-18T17:52:02.753703+00:00",
+      "deployedAt": "2026-11-22T14:25:24.982636+00:00",
       "externalLaunchUrl": null,
-      "engineVersion": "1.44.1",
+      "engineVersion": "1.47.0",
       "deployWarning": null
     },
     "description": "Slide numbered blocks across a grid and merge equal values to build ever-larger tiles.",
@@ -36,19 +36,19 @@
     "links": [],
     "isDisabled": false
   },
-  "publishedAt": "2026-11-18T17:52:02.738Z",
-  "sourceCommit": "fc3eaae3f1bd18caacb2f49b929f13ffe07ac4d2",
-  "bytesReceived": 2689764,
-  "archiveSha256": "6124b47684166028884a5038a736253f9f293ce41b649e042a1029713fc51ff2",
+  "publishedAt": "2026-11-22T14:25:25.425Z",
+  "sourceCommit": "028d499e2292fe29da5ce0f43077360f729bcb08",
+  "bytesReceived": 2690530,
+  "archiveSha256": "a99b27659634ab423960434482c0d55a4a31109c296e422ac9bfbed7db53a70e",
   "indexSha256": "65f6c68286facede54a0a0482a04e503727ad55f154ce04ac39082b7508fe108",
   "result": {
     "clientPublished": true,
     "serverImageLoaded": false,
     "imageDigest": null,
-    "bytesReceived": 2689764,
+    "bytesReceived": 2690530,
     "mode": "replace",
     "filesRemoved": 0,
-    "engineVersion": "1.44.1",
+    "engineVersion": "1.47.0",
     "deployWarning": null
   },
   "liveVerification": {
