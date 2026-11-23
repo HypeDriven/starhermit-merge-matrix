@@ -1,3 +1,4 @@
+import { showCursor } from "./cursor.ts";
 import { withLanguageRender as __l10nRender } from "./l10n/menu.ts";
 // Merge Matrix on the StarHermit engine: the entry module (starhermit.txt
 // engine.entry), played natively by the StarHermit client and in browsers by
@@ -506,6 +507,7 @@ function applyThemes(): void {
 audio.onCaption((key, vars) => { if (options.captions) app.caption = { text: T(key, vars ?? null), until: now() + 0.9 }; });
 
 onStart(() => {
+  showCursor();
   initStyles();
   platform.initPlatform();
   audio.loadSfx();
