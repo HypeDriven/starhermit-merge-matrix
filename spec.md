@@ -16,7 +16,7 @@ grid can hold — with a seeded board that anyone can replay move for move.
 | Genre | Deterministic slide-and-merge number puzzle (2048 lineage, seeded/verified) |
 | Players | 1, with asynchronous daily comparison |
 | Session length | 3–6 min (lesson or challenge), 8–20 min (2048 practice run) |
-| Platforms | StarHermit engine script game (engine 1.50.0, host API 1.50, `engine.minor=50`): natively in the StarHermit client and in desktop and mobile browsers on the engine's web runtime; portrait and landscape |
+| Platforms | StarHermit engine script game (engine 1.51.0, host API 1.51, `engine.minor=51`): natively in the StarHermit client and in desktop and mobile browsers on the engine's web runtime; portrait and landscape |
 | Rendering | `starhermit:scene` (three.js r185 parity) 3D board drawn into the playfield between the `starhermit:ui` top bar and rails; a flat board drawn in the UI when the 3D board is switched off |
 | Build | TypeScript run directly by the runtime (`engine.entry=native/main.ts`); `tsc --noEmit` type-checks against `.starhermit/starhermit.d.ts`; `npm run package` writes the web loader `index.html` and `starhermit-files.json` |
 
@@ -472,7 +472,7 @@ second row rather than clipping, and nothing is sized to a fixed English string.
 ## 12. StarHermit integration
 
 `starhermit.txt` declares the engine (`engine.api=1`, `engine.entry=native/main.ts`,
-`engine.version=1.50.0`, `engine.minor=50`, capabilities platform, storage, clipboard),
+`engine.version=1.51.0`, `engine.minor=51`, capabilities platform, storage, clipboard),
 `launch=index.html` (the web loader), `server=score-script.js`, `cover=cover.jpg`, the owner id, the
 seven actions (`control.*` with their default keys, grouped) and their pad defaults
 (`engine.gamepad.*`). All platform features go through the runtime (`starhermit:platform`,
@@ -620,9 +620,9 @@ The string tables include complete regional variants for `fr-BE`, `de-BE`, `en-S
 
 <!-- regional-localization:end -->
 
-## Engine 1.50.0
+## Engine 1.51.0
 
-Browser play uses the StarHermit 1.50.0 web runtime on WebGPU, or WebGL 2 where WebGPU is missing. Automatic ray-traced shadows are enabled on supported Vulkan devices, with mapped-shadow fallbacks elsewhere. Packaging creates block-compressed runtime textures and compressed glTF copies, retaining original image fallbacks.
+Browser play uses the StarHermit 1.51.0 web runtime on WebGPU, or WebGL 2 where WebGPU is missing. Automatic ray-traced shadows are enabled on supported Vulkan devices, with mapped-shadow fallbacks elsewhere. Packaging creates block-compressed runtime textures and compressed glTF copies, retaining original image fallbacks.
 
 The help screen replays through retained native UI while its contents, options, layout and key bindings are unchanged.
 
