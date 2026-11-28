@@ -46,7 +46,6 @@ export function loadSfx(): void {
   for (const name of new Set([...Object.values(SFX), ...MERGE])) {
     loadClip(`sfx/${name}.opus`).then((c) => { clips.set(name, c); }, (e: unknown) => console.warn(`sfx ${name}: ${String(e)}`));
   }
-  renderClips();
 }
 /** The pause sheet (and a hidden window) holds all sound. */
 export function setSuspended(on: boolean): void { suspended = on; }
@@ -151,7 +150,17 @@ export function start(): void { started = true; }
 export function setMusicIntensity(v: number): void { intensity = Math.max(0, Math.min(1, v)); }
 
 /** Each frame, once the mixer runs and the clips are rendered: the ambience by state and the music's next step by mixer time. */
+let __bedsStarted = false;
+function startBeds(): void {
+  if (__bedsStarted) return;
+  __bedsStarted = true;
+  void (async () => {
+    renderClips();
+  })();
+}
+
 export function update(): void {
+  startBeds();
   if (context.state !== "running" || notes.size < SCALE.length || !low || !ambience) return;
   const want = started && !suspended;
   try {
